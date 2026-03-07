@@ -1,35 +1,35 @@
-# Profile: 通用 (General)
+# Profile: General (通用兜底)
 
-## 触发条件
+## Trigger Condition
 
-当用户输入无法明确匹配到其他 Profile（photo, illustration, diagram, text-heavy, minimal）时，归入此 Profile。
+When user input cannot be clearly matched to any other Profile (photo, illustration, diagram, text-heavy, minimal), fall back to this Profile.
 
-## 行为
+## Behavior
 
-**仅执行基础优化，不做任何增强补全。**
+**Only perform base optimization — no enhancement at all.**
 
-基础优化包括：
-1. 格式修正（标签式 → 自然语言）
-2. 智能翻译（描述翻译，画面内文字保留）
-3. 结构化（主体前置）
+Base optimization includes:
+1. Format correction (tag-style → natural language)
+2. Smart translation (translate descriptions, preserve in-image text)
+3. Structuring (subject first)
 
-## 设计原则
+## Design Principle
 
-- 宁可少优化，不扭曲用户意图
-- 用户没说要什么风格，就不加风格
-- 用户没说要什么光线，就不加光线
-- 忠实传达用户的描述，仅做格式和语言转换
+- Prefer less optimization over distorting user intent
+- User didn't specify a style → don't add a style
+- User didn't specify lighting → don't add lighting
+- Faithfully convey the user's description; only perform format and language conversion
 
-## 示例
+## Example
 
-**用户输入**: 一只猫趴在键盘上
+**User input**: 一只猫趴在键盘上
 
-**基础优化结果**: A cat lying on a keyboard
+**Base optimization**: A cat lying on a keyboard
 
-**不会添加**: 任何风格、光线、构图、氛围描述
+**Will NOT add**: any style, lighting, composition, or atmosphere descriptions
 
-## 何时升级到其他 Profile
+## When to Upgrade to Another Profile
 
-如果在分析过程中发现了明确的风格信号（如"写实的""动漫风格的""画一个流程图"），应重新分类到对应 Profile，而不是留在 general。
+If during analysis you discover clear style signals (e.g., "写实的", "动漫风格的", "画一个流程图"), reclassify to the corresponding Profile instead of staying in general.
 
-general 是兜底选择，不是默认选择。优先尝试匹配具体 Profile。
+General is the fallback choice, not the default choice. Always try to match a specific Profile first.
