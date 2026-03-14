@@ -5,7 +5,7 @@ A [Claude Code Skill](https://docs.anthropic.com/en/docs/claude-code/skills) tha
 ## What It Does
 
 1. **Smart prompt optimization** — Translates Chinese descriptions into high-quality English prompts, fixing common issues (keyword dumps, SD/MJ syntax, negative phrasing, etc.)
-2. **Intent-aware enhancement** — Automatically detects image intent (photo, illustration, diagram, text-heavy, minimal) and applies domain-specific prompt enhancements
+2. **Intent-aware enhancement** — Automatically detects image intent (photo, illustration, diagram, text-heavy, minimal, sticker, 3D, product, concept-art) and applies domain-specific prompt enhancements
 3. **In-image text preservation** — Keeps Chinese text meant to appear in the image (e.g. `写着"生日快乐"的蛋糕` → `a cake with the text "生日快乐"`)
 4. **Multiple generation modes** — Default (interactive), Direct (no confirmations), and Raw (translate-only)
 
@@ -77,6 +77,18 @@ This will:
 # Specify aspect ratio and model
 /nanobanana 山水画风格的桂林风景 --aspect 16:9 --model gemini-2.0-flash-preview-image-generation
 
+# Sticker / emoji
+/nanobanana 画一个开心的柴犬表情包
+
+# 3D render
+/nanobanana 等距视角的咖啡店室内设计
+
+# Product photography
+/nanobanana 白底蓝牙耳机产品图
+
+# Concept art
+/nanobanana 赛博朋克风格的女性角色设计
+
 # Edit an existing image
 /nanobanana edit 把背景换成海滩 --input photo.png
 
@@ -95,7 +107,7 @@ User input (Chinese)
   │   └─ Structuring (subject first, add trigger prefix)
   │
   ├─ Phase 2: Intent Recognition
-  │   └─ Match to profile: photo / illustration / diagram / text-heavy / minimal / general
+  │   └─ Match to profile: photo / illustration / diagram / text-heavy / minimal / sticker / 3d / product / concept-art / general
   │
   └─ Phase 3: Enhancement (if profile matched)
       └─ Load profile-specific rules → fill missing dimensions → confirm with user
@@ -124,6 +136,10 @@ nanobanana/
         ├── diagram.md
         ├── text-heavy.md
         ├── minimal.md
+        ├── sticker.md
+        ├── 3d.md
+        ├── product.md
+        ├── concept-art.md
         └── general.md
 ```
 
