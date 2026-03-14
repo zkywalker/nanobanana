@@ -49,8 +49,34 @@ After base optimization, check and fill in the following dimensions as needed (o
 
 **After user selects anime**: A little witch holding a magic wand, anime style, vibrant colors, clean lines with cel-shading, simple gradient background, cheerful and whimsical mood
 
+## Known IP Character Handling
+
+When the subject is a well-known character (from anime, games, movies, etc.):
+
+- **Do NOT describe their appearance** — the model already knows what Tachikoma, Pikachu, Totoro, etc. look like
+- **Only add**: art style, rendering technique, color palette tendency, background treatment, mood
+- **Rationale**: vague descriptions like "round body, optical eyes" can override the model's correct internal knowledge and introduce visual artifacts (e.g., human-like eyes on a robot)
+
+**Example — Known IP character**:
+
+User input: tachikoma（攻壳机动队）头像，像素风格，可爱
+
+- ✅ Good: `Create an image of a cute Tachikoma from Ghost in the Shell as a profile avatar, pixel art style with visible pixels and limited color palette, retro pixel aesthetic, clean simple background, cheerful and playful mood`
+- ❌ Bad: `...the iconic blue spider-like robot with round body and optical eyes rendered in chibi proportions...` (vague appearance description distorts the character)
+
+## Non-Humanoid "Cute" Expression
+
+For robots, vehicles, creatures, and other non-humanoid subjects, "cute/可爱" should be conveyed through:
+- Rounded shapes, soft curves, compact proportions
+- Bright or pastel color palette
+- Soft, warm lighting
+- Playful composition or pose
+
+Do NOT add: human facial features (eyes, mouth, smile), chibi/Q版 proportions, or anthropomorphic expressions. These cause the model to render human-like faces on non-human entities.
+
 ## Behavioral Notes
 
 - Illustration styles are extremely diverse; when uncertain, prefer not adding a style keyword and let the user choose
 - Never apply photographic lens language (85mm lens, bokeh) to illustrations
 - Text in manga/anime is typically a visual element — preserve original language, do not translate
+- **When unsure if a descriptor is unambiguous, omit it** — a missing detail is better than a misleading one

@@ -38,6 +38,7 @@ Route user input to the appropriate action based on arguments:
 | `init` | Check environment config (API key, dependencies, connectivity); guide user through setup |
 | `help` | Show usage instructions (brief list of supported commands and examples) |
 | `<中文描述>` | Default flow: base optimization → intent recognition → optional enhancement → generate |
+| `edit <描述> --input <图片路径>` | Edit an existing image: optimize prompt → call edit subcommand |
 | `optimize <描述>` | Optimize prompt only; display result without generating image |
 | `generate <English prompt>` | Generate image directly with given English prompt (skip optimization) |
 | `models` | Run `python3 scripts/nanobanana.py models` to list available models |
@@ -47,6 +48,7 @@ Optional flags (append to any generation command):
 - `--aspect <ratio>` — aspect ratio (e.g., 16:9, 1:1, 9:16)
 - `--size <WxH>` — output dimensions (e.g., 1024x1024)
 - `--output <path>` — specify output path
+- `--input <path>` — source image for edit commands
 - `--direct` — direct mode: trust optimization fully, skip all confirmations, generate immediately
 - `--raw` — raw mode: translate only, no optimization, generate immediately
 
@@ -207,10 +209,27 @@ Analyze user input and match the most appropriate enhancement Profile:
 If intent recognition matched a specific Profile (not general):
 
 1. **Read the corresponding Profile file**: `Read` `references/profiles/{profile_name}.md`
-2. **Fill in missing dimensions per Profile rules**: only add what the user didn't mention; never override existing expressions
-3. **Decide whether to confirm based on mode**:
+2. **Classify the subject** before enhancing (see Subject Classification below)
+3. **Fill in missing dimensions per Profile rules**: only add what the user didn't mention; never override existing expressions
+4. **Decide whether to confirm based on mode**:
    - Default mode → show enhanced result, wait for user to confirm/edit/reject
    - Direct mode → use enhanced result directly
+
+#### Subject Classification
+
+Before adding any enhancement, classify the subject into one of these categories and apply corresponding constraints:
+
+| Subject Type | Examples | Enhancement Strategy |
+|---|---|---|
+| **Known IP character** | Tachikoma, Pikachu, R2-D2, Totoro, Iron Man | **Only enhance style + mood + background. Do NOT add appearance descriptions** — the model already knows what these characters look like. Vague or inaccurate descriptions override the model's correct knowledge and cause distortion. |
+| **Non-humanoid entity** | Robots, vehicles, animals, abstract creatures | **Avoid anthropomorphic language** — no "eyes", "smile", "face", "chibi proportions". Use form-appropriate terms: "compact design", "rounded silhouette", "soft curves", "bright color palette". |
+| **Original / generic character** | "a girl", "an old man", "a warrior" | Normal enhancement — can add appearance, pose, expression details. |
+| **Scene / object** | Landscapes, food, still life, architecture | Normal enhancement — can add environment, lighting, material details. |
+
+**Key principles**:
+- **Ambiguous terms are worse than no terms** — if a word could be misinterpreted (e.g., "optical eyes" on a robot → model renders human eyes), do not add it. Only use unambiguous descriptors.
+- **"Cute" ≠ anthropomorphic** — for non-humanoid subjects, express cuteness through: rounded shapes, bright/pastel colors, compact proportions, soft lighting, playful composition. NOT through adding faces, expressions, or chibi features.
+- **Less is more for known characters** — the model's built-in knowledge of famous characters is usually more accurate than our text descriptions. Trust it.
 
 **Default mode enhancement confirmation format**:
 
@@ -248,6 +267,29 @@ If `general` was matched: skip enhancement confirmation, generate directly with 
    - **Quota exceeded**: suggest retrying later
    - **Network error**: check proxy endpoint config
    - **Auth failure**: check API key in `~/.gemini/.env`
+
+## Image Editing Flow
+
+When the user provides an edit command with a source image:
+
+1. **Validate input**: confirm the `--input` image path exists and is readable
+2. **Optimize the edit prompt**: run base optimization (Phase 1) on the edit instruction — skip intent-based enhancement (Phase 2/3), since edit instructions are usually specific enough
+3. **Build command**:
+   ```bash
+   python3 ~/.claude/skills/nanobananaskill/scripts/nanobanana.py edit "<prompt>" --input <image_path> [--model MODEL] [--output PATH]
+   ```
+4. **Execute script and parse JSON output**
+5. **On success**, display result:
+   ```
+   ✅ 图片已编辑
+   📁 路径: [file_path]
+   📥 原图: [input_path]
+   🔧 模型: [model] | 尺寸: [WxH]
+   📝 使用的 Prompt: [final prompt used]
+   💬 模型说明: [model_text, if any]
+   ```
+   Remind user they can view the image with the Read tool.
+6. **On failure**, provide suggestions based on error type (same as generation flow)
 
 ## Iteration Guide
 

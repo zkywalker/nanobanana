@@ -149,6 +149,138 @@ def cmd_models(args):
     print(json.dumps({"status": "ok", "models": models}, ensure_ascii=False))
 
 
+def cmd_edit(args):
+    """Edit an existing image based on a text prompt."""
+    import io
+
+    # Validate input image before importing heavy dependencies
+    input_path = Path(args.input)
+    if not input_path.exists():
+        print(json.dumps({
+            "status": "error",
+            "error": f"Input image not found: {input_path}",
+        }, ensure_ascii=False))
+        sys.exit(1)
+
+    from google.genai import types
+    from PIL import Image
+
+    try:
+        input_image = Image.open(str(input_path))
+    except Exception as e:
+        print(json.dumps({
+            "status": "error",
+            "error": f"Cannot read input image: {e}",
+        }, ensure_ascii=False))
+        sys.exit(1)
+
+    config_data = load_env()
+    client = get_client(config_data)
+
+    model = args.model or "gemini-3-pro-image-preview"
+    prompt = args.prompt
+
+    # Determine output path
+    if args.output:
+        output_path = Path(args.output)
+    else:
+        output_dir = Path.cwd()
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_path = output_dir / f"nanobanana_edit_{timestamp}.png"
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    try:
+        generate_config = types.GenerateContentConfig(
+            response_modalities=["TEXT", "IMAGE"],
+        )
+
+        response = client.models.generate_content(
+            model=model,
+            contents=[prompt, input_image],
+            config=generate_config,
+        )
+
+        # Extract image and text from response
+        if not response.candidates or not response.candidates[0].content.parts:
+            print(json.dumps({
+                "status": "error",
+                "error": "No response generated. The model may have refused the prompt due to content policy.",
+                "prompt": prompt,
+                "model": model,
+            }, ensure_ascii=False))
+            sys.exit(1)
+
+        image_part = None
+        text_parts = []
+        for part in response.candidates[0].content.parts:
+            if part.inline_data and part.inline_data.mime_type.startswith("image/"):
+                image_part = part
+            elif hasattr(part, "text") and part.text:
+                text_parts.append(part.text)
+
+        if not image_part:
+            error_msg = "No image in response."
+            if text_parts:
+                error_msg += f" Model said: {' '.join(text_parts)}"
+            print(json.dumps({
+                "status": "error",
+                "error": error_msg,
+                "prompt": prompt,
+                "model": model,
+            }, ensure_ascii=False))
+            sys.exit(1)
+
+        # Save image
+        image_data = image_part.inline_data.data
+        image = Image.open(io.BytesIO(image_data))
+
+        # Handle size parameter
+        if args.size:
+            try:
+                w, h = map(int, args.size.split("x"))
+                image = image.resize((w, h), Image.LANCZOS)
+            except ValueError:
+                pass
+
+        image.save(str(output_path), "PNG")
+
+        result = {
+            "status": "ok",
+            "file": str(output_path),
+            "input": str(input_path),
+            "model": model,
+            "prompt": prompt,
+            "image_size": f"{image.width}x{image.height}",
+        }
+        if text_parts:
+            result["model_text"] = " ".join(text_parts)
+        print(json.dumps(result, ensure_ascii=False))
+
+    except Exception as e:
+        error_msg = str(e)
+        hint = ""
+        if "SAFETY" in error_msg.upper() or "BLOCKED" in error_msg.upper():
+            hint = "Content was blocked by safety filters. Try rephrasing the prompt."
+        elif "QUOTA" in error_msg.upper() or "429" in error_msg:
+            hint = "API quota exceeded. Wait a moment and try again."
+        elif "401" in error_msg or "403" in error_msg:
+            hint = "Authentication failed. Check GEMINI_API_KEY in ~/.gemini/.env"
+        elif "TIMEOUT" in error_msg.upper() or "CONNECT" in error_msg.upper():
+            hint = "Network error. Check your connection and base_url in ~/.gemini/.env"
+
+        result = {
+            "status": "error",
+            "error": error_msg,
+            "prompt": prompt,
+            "model": model,
+        }
+        if hint:
+            result["hint"] = hint
+        print(json.dumps(result, ensure_ascii=False))
+        sys.exit(1)
+
+
 def cmd_generate(args):
     """Generate an image from a text prompt."""
     from google.genai import types
@@ -275,6 +407,14 @@ def main():
     gen_parser.add_argument("--size", "-s", help="Resize output to WxH, e.g. 1024x1024")
     gen_parser.add_argument("--output", "-o", help="Output file path (default: current directory)")
 
+    # edit command
+    edit_parser = subparsers.add_parser("edit", help="Edit an existing image with a text prompt")
+    edit_parser.add_argument("prompt", help="Text prompt describing the edit")
+    edit_parser.add_argument("--input", "-i", required=True, help="Path to the source image")
+    edit_parser.add_argument("--model", "-m", help="Model ID (default: gemini-3-pro-image-preview)")
+    edit_parser.add_argument("--size", "-s", help="Resize output to WxH, e.g. 1024x1024")
+    edit_parser.add_argument("--output", "-o", help="Output file path (default: current directory)")
+
     # models command
     subparsers.add_parser("models", help="List available models")
 
@@ -286,6 +426,8 @@ def main():
 
     if args.command == "generate":
         cmd_generate(args)
+    elif args.command == "edit":
+        cmd_edit(args)
     elif args.command == "models":
         cmd_models(args)
     elif args.command == "init":
