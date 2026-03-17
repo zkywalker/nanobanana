@@ -10,14 +10,11 @@ from datetime import datetime
 from pathlib import Path
 
 
-def load_env():
-    """Load API config from ~/.gemini/.env"""
-    env_path = Path.home() / ".gemini" / ".env"
-    if not env_path.exists():
-        print(json.dumps({"status": "error", "error": f"Config not found: {env_path}"}))
-        sys.exit(1)
-
+def load_dotenv(env_path):
+    """Parse a .env file into a dict."""
     config = {}
+    if not env_path.exists():
+        return config
     for line in env_path.read_text().strip().splitlines():
         line = line.strip()
         if not line or line.startswith("#"):
@@ -25,6 +22,79 @@ def load_env():
         if "=" in line:
             key, value = line.split("=", 1)
             config[key.strip()] = value.strip()
+    return config
+
+
+SKILL_CONFIG_PATH = Path.home() / ".config" / "nanobanana" / "config.json"
+LEGACY_ENV_PATH = Path.home() / ".gemini" / ".env"
+
+# Mapping from config.json keys to internal config keys
+CONFIG_KEY_MAP = {
+    "api_key": "GEMINI_API_KEY",
+    "base_url": "GOOGLE_GEMINI_BASE_URL",
+}
+
+
+def load_config(config_file=None):
+    """Load API config with priority chain:
+    1. Explicit --config file (JSON or .env)
+    2. Environment variables
+    3. Skill config: ~/.config/nanobanana/config.json
+    4. Legacy .env:  ~/.gemini/.env
+    """
+    config = {}
+
+    # Layer 4 (lowest): legacy ~/.gemini/.env
+    config.update(load_dotenv(LEGACY_ENV_PATH))
+
+    # Layer 3: skill config ~/.config/nanobanana/config.json
+    if SKILL_CONFIG_PATH.exists():
+        try:
+            data = json.loads(SKILL_CONFIG_PATH.read_text())
+            for json_key, env_key in CONFIG_KEY_MAP.items():
+                if json_key in data and data[json_key]:
+                    config[env_key] = data[json_key]
+        except (json.JSONDecodeError, KeyError):
+            pass
+
+    # Layer 2: environment variables
+    for env_key in ("GEMINI_API_KEY", "GOOGLE_GEMINI_BASE_URL"):
+        val = os.environ.get(env_key)
+        if val:
+            config[env_key] = val
+
+    # Layer 1 (highest): explicit --config file
+    if config_file:
+        cf = Path(config_file)
+        if not cf.exists():
+            print(json.dumps({"status": "error", "error": f"Config file not found: {cf}"}))
+            sys.exit(1)
+        if cf.suffix == ".json":
+            try:
+                data = json.loads(cf.read_text())
+                for json_key, env_key in CONFIG_KEY_MAP.items():
+                    if json_key in data and data[json_key]:
+                        config[env_key] = data[json_key]
+            except (json.JSONDecodeError, KeyError) as e:
+                print(json.dumps({"status": "error", "error": f"Invalid JSON config: {e}"}))
+                sys.exit(1)
+        else:
+            config.update(load_dotenv(cf))
+
+    if not config.get("GEMINI_API_KEY"):
+        sources = [
+            f"  --config <file>",
+            f"  env GEMINI_API_KEY",
+            f"  {SKILL_CONFIG_PATH}",
+            f"  {LEGACY_ENV_PATH}",
+        ]
+        print(json.dumps({
+            "status": "error",
+            "error": "GEMINI_API_KEY not found in any config source",
+            "searched": sources,
+        }, ensure_ascii=False))
+        sys.exit(1)
+
     return config
 
 
@@ -36,7 +106,7 @@ def get_client(config):
     base_url = config.get("GOOGLE_GEMINI_BASE_URL", "")
 
     if not api_key:
-        print(json.dumps({"status": "error", "error": "GEMINI_API_KEY not set in ~/.gemini/.env"}))
+        print(json.dumps({"status": "error", "error": "GEMINI_API_KEY not found in config"}))
         sys.exit(1)
 
     http_options = {"api_version": "v1beta"}
@@ -49,39 +119,58 @@ def get_client(config):
 def cmd_init(args):
     """Check environment readiness and guide user through setup."""
     checks = []
-    env_path = Path.home() / ".gemini" / ".env"
 
-    # 1. Check config file
-    if env_path.exists():
-        config = {}
-        for line in env_path.read_text().strip().splitlines():
-            line = line.strip()
-            if not line or line.startswith("#"):
-                continue
-            if "=" in line:
-                key, value = line.split("=", 1)
-                config[key.strip()] = value.strip()
+    # 1. Check config sources
+    config_sources = []
+    if os.environ.get("GEMINI_API_KEY"):
+        config_sources.append("env")
+    if SKILL_CONFIG_PATH.exists():
+        config_sources.append(str(SKILL_CONFIG_PATH))
+    if LEGACY_ENV_PATH.exists():
+        config_sources.append(str(LEGACY_ENV_PATH))
 
-        checks.append({"name": "config_file", "ok": True, "path": str(env_path)})
-
-        # 2. Check API key
-        api_key = config.get("GEMINI_API_KEY", "")
-        if api_key:
-            masked = api_key[:8] + "..." + api_key[-4:] if len(api_key) > 12 else "***"
-            checks.append({"name": "api_key", "ok": True, "value": masked})
-        else:
-            checks.append({"name": "api_key", "ok": False, "error": "GEMINI_API_KEY not set"})
-
-        # 3. Check base URL
-        base_url = config.get("GOOGLE_GEMINI_BASE_URL", "")
-        if base_url:
-            checks.append({"name": "base_url", "ok": True, "value": base_url})
-        else:
-            checks.append({"name": "base_url", "ok": True, "value": "(default Google endpoint)"})
+    if config_sources:
+        checks.append({"name": "config_source", "ok": True, "sources": config_sources})
     else:
-        checks.append({"name": "config_file", "ok": False, "error": f"Not found: {env_path}"})
-        checks.append({"name": "api_key", "ok": False, "error": "Config file missing"})
-        checks.append({"name": "base_url", "ok": False, "error": "Config file missing"})
+        checks.append({"name": "config_source", "ok": False,
+                        "error": f"No config found. Create {SKILL_CONFIG_PATH} or {LEGACY_ENV_PATH}"})
+
+    # Try to load merged config (without exiting on failure)
+    config = {}
+    try:
+        # Layer 4: legacy .env
+        config.update(load_dotenv(LEGACY_ENV_PATH))
+        # Layer 3: skill config
+        if SKILL_CONFIG_PATH.exists():
+            try:
+                data = json.loads(SKILL_CONFIG_PATH.read_text())
+                for json_key, env_key in CONFIG_KEY_MAP.items():
+                    if json_key in data and data[json_key]:
+                        config[env_key] = data[json_key]
+            except (json.JSONDecodeError, KeyError):
+                pass
+        # Layer 2: env vars
+        for env_key in ("GEMINI_API_KEY", "GOOGLE_GEMINI_BASE_URL"):
+            val = os.environ.get(env_key)
+            if val:
+                config[env_key] = val
+    except Exception:
+        pass
+
+    # 2. Check API key
+    api_key = config.get("GEMINI_API_KEY", "")
+    if api_key:
+        masked = api_key[:8] + "..." + api_key[-4:] if len(api_key) > 12 else "***"
+        checks.append({"name": "api_key", "ok": True, "value": masked})
+    else:
+        checks.append({"name": "api_key", "ok": False, "error": "GEMINI_API_KEY not found in any config source"})
+
+    # 3. Check base URL
+    base_url = config.get("GOOGLE_GEMINI_BASE_URL", "")
+    if base_url:
+        checks.append({"name": "base_url", "ok": True, "value": base_url})
+    else:
+        checks.append({"name": "base_url", "ok": True, "value": "(default Google endpoint)"})
 
     # 4. Check Python dependencies
     deps = {}
@@ -98,7 +187,6 @@ def cmd_init(args):
     # 5. API connectivity test (only if basic checks pass)
     if all_ok and not args.skip_test:
         try:
-            config = load_env()
             client = get_client(config)
             response = client.models.generate_content(
                 model="gemini-3-pro-image-preview",
@@ -120,13 +208,21 @@ def cmd_init(args):
     if not all_ok:
         setup_guide = {
             "steps": [
-                "1. Create config directory: mkdir -p ~/.gemini",
-                "2. Create ~/.gemini/.env with the following content:",
-                "   GEMINI_API_KEY=your_api_key_here",
-                "   GOOGLE_GEMINI_BASE_URL=https://generativelanguage.googleapis.com  (or your proxy URL)",
-                "3. Get your API key from: https://aistudio.google.com/apikey",
-                "4. Install dependencies: pip install google-genai pillow",
-                "5. Run again: python3 nanobanana.py init",
+                "Option A (recommended): Create skill config:",
+                f"  1. mkdir -p {SKILL_CONFIG_PATH.parent}",
+                f'  2. Create {SKILL_CONFIG_PATH} with:',
+                '     {"api_key": "your_api_key_here", "base_url": "https://..."}',
+                "Option B: Create legacy .env:",
+                f"  1. mkdir -p {LEGACY_ENV_PATH.parent}",
+                f"  2. Create {LEGACY_ENV_PATH} with:",
+                "     GEMINI_API_KEY=your_api_key_here",
+                "     GOOGLE_GEMINI_BASE_URL=https://...  (optional)",
+                "Option C: Set environment variables:",
+                "  export GEMINI_API_KEY=your_api_key_here",
+                "",
+                "Get your API key from: https://aistudio.google.com/apikey",
+                "Install dependencies: pip install google-genai pillow",
+                f"Run again: python3 nanobanana.py init",
             ]
         }
 
@@ -174,7 +270,7 @@ def cmd_edit(args):
         }, ensure_ascii=False))
         sys.exit(1)
 
-    config_data = load_env()
+    config_data = load_config(getattr(args, "config", None))
     client = get_client(config_data)
 
     model = args.model or "gemini-3-pro-image-preview"
@@ -265,9 +361,9 @@ def cmd_edit(args):
         elif "QUOTA" in error_msg.upper() or "429" in error_msg:
             hint = "API quota exceeded. Wait a moment and try again."
         elif "401" in error_msg or "403" in error_msg:
-            hint = "Authentication failed. Check GEMINI_API_KEY in ~/.gemini/.env"
+            hint = "Authentication failed. Check your GEMINI_API_KEY config."
         elif "TIMEOUT" in error_msg.upper() or "CONNECT" in error_msg.upper():
-            hint = "Network error. Check your connection and base_url in ~/.gemini/.env"
+            hint = "Network error. Check your connection and base_url config."
 
         result = {
             "status": "error",
@@ -287,7 +383,7 @@ def cmd_generate(args):
     from PIL import Image
     import io
 
-    config = load_env()
+    config = load_config(getattr(args, "config", None))
     client = get_client(config)
 
     model = args.model or "gemini-3-pro-image-preview"
@@ -379,9 +475,9 @@ def cmd_generate(args):
         elif "QUOTA" in error_msg.upper() or "429" in error_msg:
             hint = "API quota exceeded. Wait a moment and try again."
         elif "401" in error_msg or "403" in error_msg:
-            hint = "Authentication failed. Check GEMINI_API_KEY in ~/.gemini/.env"
+            hint = "Authentication failed. Check your GEMINI_API_KEY config."
         elif "TIMEOUT" in error_msg.upper() or "CONNECT" in error_msg.upper():
-            hint = "Network error. Check your connection and base_url in ~/.gemini/.env"
+            hint = "Network error. Check your connection and base_url config."
 
         result = {
             "status": "error",
@@ -397,6 +493,7 @@ def cmd_generate(args):
 
 def main():
     parser = argparse.ArgumentParser(description="Nano Banana - Gemini image generation")
+    parser.add_argument("--config", help="Path to config file (JSON or .env)")
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
     # generate command

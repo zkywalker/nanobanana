@@ -19,7 +19,11 @@ You are the Nano Banana image generation assistant. Your job is to optimize the 
 - **Prompt guide**: `~/.claude/skills/nanobananaskill/references/prompt-guide.md`
 - **Enhancement profiles**: `~/.claude/skills/nanobananaskill/references/profiles/`
 - **Official references**: `~/.claude/skills/nanobananaskill/references/official-sources.md` (authoritative source URLs, core example library, model reference)
-- **API config**: `~/.gemini/.env` (GEMINI_API_KEY + GOOGLE_GEMINI_BASE_URL)
+- **API config** (priority high→low):
+  1. `--config <file>` CLI flag
+  2. Environment variables (`GEMINI_API_KEY`, `GOOGLE_GEMINI_BASE_URL`)
+  3. Skill config: `~/.config/nanobanana/config.json` (`{"api_key": "...", "base_url": "..."}`)
+  4. Legacy .env: `~/.gemini/.env` (`GEMINI_API_KEY=...`)
 - **Output directory**: current working directory (where the skill is invoked)
 
 ## First-Run Detection
@@ -102,24 +106,23 @@ If `dependencies.ok` is false:
 
 ### Step 3: Fix missing config file
 
-If `config_file.ok` is false (i.e., `~/.gemini/.env` does not exist):
-1. Create the directory: `mkdir -p ~/.gemini`
-2. Ask the user for their Gemini API key. Provide guidance:
+If `config_source.ok` is false (no config found anywhere):
+1. Ask the user for their Gemini API key. Provide guidance:
    - **Official Google API**: get a key from https://aistudio.google.com/apikey (free tier available)
    - **Proxy service**: if the user uses a proxy/relay (e.g., 88code), ask for their proxy key and base URL
-3. Ask if they need a custom base URL (for proxy users) or will use the default Google endpoint
-4. Once the user provides the key (and optionally base URL), create `~/.gemini/.env`:
+2. Ask if they need a custom base URL (for proxy users) or will use the default Google endpoint
+3. Once the user provides the key (and optionally base URL), create `~/.config/nanobanana/config.json`:
+   ```json
+   {"api_key": "<user's key>", "base_url": "<url if provided>"}
    ```
-   GEMINI_API_KEY=<user's key>
-   GOOGLE_GEMINI_BASE_URL=<url if provided, otherwise omit this line>
-   ```
+   (Omit `base_url` field if using default Google endpoint)
 
 ### Step 4: Fix missing API key
 
-If config file exists but `api_key.ok` is false:
-- The `.env` file exists but `GEMINI_API_KEY` is empty or missing
+If config source exists but `api_key.ok` is false:
+- A config file exists but `GEMINI_API_KEY` / `api_key` is empty or missing
 - Ask the user for their key (same guidance as Step 3)
-- Write/update the key in `~/.gemini/.env`
+- Write/update the key in `~/.config/nanobanana/config.json` (preferred) or the existing config file
 
 ### Step 5: Run full diagnostics with API test
 
