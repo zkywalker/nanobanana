@@ -55,6 +55,7 @@ Optional flags (append to any generation command):
 - `--input <path>` — source image for edit commands
 - `--direct` — direct mode: trust optimization fully, skip all confirmations, generate immediately
 - `--raw` — raw mode: translate only, no optimization, generate immediately
+- `--no-fallback` — disable automatic model fallback; fail immediately if the requested model is unavailable
 
 ## Three Optimization Modes
 
@@ -261,7 +262,14 @@ If `general` was matched: skip enhancement confirmation, generate directly with 
 
 2. Execute script and parse JSON output
 
-3. On success, display result:
+3. **Automatic model fallback**: When a model returns a server error (500/502/503/504), the script automatically tries the next model in the fallback chain:
+   `gemini-3-pro-image-preview` → `gemini-3.1-flash-image-preview` → `gemini-2.5-flash-image` → `gemini-2.0-flash-preview-image-generation`
+   - If fallback occurred, the JSON output includes `fallback_from` (original model) and `models_tried` (attempt log)
+   - Display which model was actually used and note the fallback
+   - Only server-side errors trigger fallback; content policy blocks, auth errors, etc. fail immediately
+   - Use `--no-fallback` to disable this behavior
+
+4. On success, display result:
    ```
    ✅ 图片已生成
    📁 路径: [file_path]
@@ -270,7 +278,7 @@ If `general` was matched: skip enhancement confirmation, generate directly with 
    ```
    Remind user they can view the image with the Read tool.
 
-4. On failure, provide suggestions based on error type:
+5. On failure, provide suggestions based on error type:
    - **Content policy block**: suggest rephrasing sensitive terms
    - **Quota exceeded**: suggest retrying later
    - **Network error**: check proxy endpoint config

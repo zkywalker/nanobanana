@@ -239,10 +239,40 @@ def cmd_init(args):
 IMAGE_KEYWORDS = {"image", "imagen"}
 DEFAULT_MODEL = "gemini-3-pro-image-preview"
 
+# Ordered fallback chain: try these models in sequence when the requested model fails
+MODEL_FALLBACK_CHAIN = [
+    "gemini-3-pro-image-preview",
+    "gemini-3.1-flash-image-preview",
+    "gemini-2.5-flash-image",
+    "gemini-2.0-flash-preview-image-generation",
+]
+
+# HTTP status codes that trigger fallback (server-side, not user's fault)
+FALLBACK_STATUS_CODES = {"500", "502", "503", "504", "UNAVAILABLE", "INTERNAL", "OVERLOADED"}
+
 FALLBACK_MODELS = [
     {"id": "gemini-3-pro-image-preview", "display_name": "Gemini 3 Pro Image Preview", "default": True},
+    {"id": "gemini-3.1-flash-image-preview", "display_name": "Gemini 3.1 Flash Image Preview", "default": False},
+    {"id": "gemini-2.5-flash-image", "display_name": "Gemini 2.5 Flash Image", "default": False},
     {"id": "gemini-2.0-flash-preview-image-generation", "display_name": "Gemini 2.0 Flash Image Generation", "default": False},
 ]
+
+
+def _is_server_error(exception):
+    """Check if an exception is a server-side error eligible for fallback."""
+    msg = str(exception).upper()
+    return any(code in msg for code in FALLBACK_STATUS_CODES)
+
+
+def _get_fallback_models(current_model):
+    """Return fallback models to try after current_model fails.
+    If current_model is in the chain, return everything after it.
+    If not in the chain, return the full chain (skipping current_model if present).
+    """
+    if current_model in MODEL_FALLBACK_CHAIN:
+        idx = MODEL_FALLBACK_CHAIN.index(current_model)
+        return MODEL_FALLBACK_CHAIN[idx + 1:]
+    return [m for m in MODEL_FALLBACK_CHAIN if m != current_model]
 
 
 def cmd_models(args):
@@ -292,8 +322,38 @@ def cmd_models(args):
         }, ensure_ascii=False))
 
 
+def _try_edit(client, model, prompt, input_image):
+    """Attempt image editing with a single model. Returns (image_part, text_parts, None) or (None, [], error_str)."""
+    from google.genai import types
+
+    response = client.models.generate_content(
+        model=model,
+        contents=[prompt, input_image],
+        config=types.GenerateContentConfig(response_modalities=["TEXT", "IMAGE"]),
+    )
+
+    if not response.candidates or not response.candidates[0].content.parts:
+        return None, [], "No response generated. The model may have refused the prompt due to content policy."
+
+    image_part = None
+    text_parts = []
+    for part in response.candidates[0].content.parts:
+        if part.inline_data and part.inline_data.mime_type.startswith("image/"):
+            image_part = part
+        elif hasattr(part, "text") and part.text:
+            text_parts.append(part.text)
+
+    if not image_part:
+        error_msg = "No image in response."
+        if text_parts:
+            error_msg += f" Model said: {' '.join(text_parts)}"
+        return None, text_parts, error_msg
+
+    return image_part, text_parts, None
+
+
 def cmd_edit(args):
-    """Edit an existing image based on a text prompt."""
+    """Edit an existing image based on a text prompt, with automatic model fallback."""
     import io
 
     # Validate input image before importing heavy dependencies
@@ -305,7 +365,6 @@ def cmd_edit(args):
         }, ensure_ascii=False))
         sys.exit(1)
 
-    from google.genai import types
     from PIL import Image
 
     try:
@@ -320,8 +379,9 @@ def cmd_edit(args):
     config_data = load_config(getattr(args, "config", None))
     client = get_client(config_data)
 
-    model = args.model or "gemini-3-pro-image-preview"
+    requested_model = args.model or DEFAULT_MODEL
     prompt = args.prompt
+    no_fallback = getattr(args, "no_fallback", False)
 
     # Determine output path
     if args.output:
@@ -333,109 +393,126 @@ def cmd_edit(args):
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    try:
-        generate_config = types.GenerateContentConfig(
-            response_modalities=["TEXT", "IMAGE"],
-        )
+    # Build model attempt list
+    if no_fallback:
+        models_to_try = [requested_model]
+    else:
+        models_to_try = [requested_model] + _get_fallback_models(requested_model)
 
-        response = client.models.generate_content(
-            model=model,
-            contents=[prompt, input_image],
-            config=generate_config,
-        )
+    tried = []
+    last_error = None
 
-        # Extract image and text from response
-        if not response.candidates or not response.candidates[0].content.parts:
-            print(json.dumps({
-                "status": "error",
-                "error": "No response generated. The model may have refused the prompt due to content policy.",
-                "prompt": prompt,
+    for model in models_to_try:
+        try:
+            image_part, text_parts, gen_error = _try_edit(client, model, prompt, input_image)
+
+            if gen_error:
+                print(json.dumps({
+                    "status": "error",
+                    "error": gen_error,
+                    "prompt": prompt,
+                    "model": model,
+                }, ensure_ascii=False))
+                sys.exit(1)
+
+            # Success — save image
+            image = Image.open(io.BytesIO(image_part.inline_data.data))
+
+            if args.size:
+                try:
+                    w, h = map(int, args.size.split("x"))
+                    image = image.resize((w, h), Image.LANCZOS)
+                except ValueError:
+                    pass
+
+            image.save(str(output_path), "PNG")
+
+            result = {
+                "status": "ok",
+                "file": str(output_path),
+                "input": str(input_path),
                 "model": model,
-            }, ensure_ascii=False))
-            sys.exit(1)
-
-        image_part = None
-        text_parts = []
-        for part in response.candidates[0].content.parts:
-            if part.inline_data and part.inline_data.mime_type.startswith("image/"):
-                image_part = part
-            elif hasattr(part, "text") and part.text:
-                text_parts.append(part.text)
-
-        if not image_part:
-            error_msg = "No image in response."
+                "prompt": prompt,
+                "image_size": f"{image.width}x{image.height}",
+            }
+            if model != requested_model:
+                result["fallback_from"] = requested_model
+                result["models_tried"] = tried + [model]
             if text_parts:
-                error_msg += f" Model said: {' '.join(text_parts)}"
-            print(json.dumps({
-                "status": "error",
-                "error": error_msg,
-                "prompt": prompt,
-                "model": model,
-            }, ensure_ascii=False))
-            sys.exit(1)
+                result["model_text"] = " ".join(text_parts)
+            print(json.dumps(result, ensure_ascii=False))
+            return
 
-        # Save image
-        image_data = image_part.inline_data.data
-        image = Image.open(io.BytesIO(image_data))
+        except Exception as e:
+            tried.append({"model": model, "error": str(e)[:150]})
+            last_error = e
+            if not _is_server_error(e):
+                break
 
-        # Handle size parameter
-        if args.size:
-            try:
-                w, h = map(int, args.size.split("x"))
-                image = image.resize((w, h), Image.LANCZOS)
-            except ValueError:
-                pass
+    # All models failed
+    error_msg = str(last_error)
+    hint = ""
+    if "SAFETY" in error_msg.upper() or "BLOCKED" in error_msg.upper():
+        hint = "Content was blocked by safety filters. Try rephrasing the prompt."
+    elif "QUOTA" in error_msg.upper() or "429" in error_msg:
+        hint = "API quota exceeded. Wait a moment and try again."
+    elif "401" in error_msg or "403" in error_msg:
+        hint = "Authentication failed. Check your GEMINI_API_KEY config."
+    elif "TIMEOUT" in error_msg.upper() or "CONNECT" in error_msg.upper():
+        hint = "Network error. Check your connection and base_url config."
 
-        image.save(str(output_path), "PNG")
+    result = {
+        "status": "error",
+        "error": error_msg,
+        "prompt": prompt,
+        "model": requested_model,
+        "models_tried": tried,
+    }
+    if hint:
+        result["hint"] = hint
+    print(json.dumps(result, ensure_ascii=False))
+    sys.exit(1)
 
-        result = {
-            "status": "ok",
-            "file": str(output_path),
-            "input": str(input_path),
-            "model": model,
-            "prompt": prompt,
-            "image_size": f"{image.width}x{image.height}",
-        }
-        if text_parts:
-            result["model_text"] = " ".join(text_parts)
-        print(json.dumps(result, ensure_ascii=False))
 
-    except Exception as e:
-        error_msg = str(e)
-        hint = ""
-        if "SAFETY" in error_msg.upper() or "BLOCKED" in error_msg.upper():
-            hint = "Content was blocked by safety filters. Try rephrasing the prompt."
-        elif "QUOTA" in error_msg.upper() or "429" in error_msg:
-            hint = "API quota exceeded. Wait a moment and try again."
-        elif "401" in error_msg or "403" in error_msg:
-            hint = "Authentication failed. Check your GEMINI_API_KEY config."
-        elif "TIMEOUT" in error_msg.upper() or "CONNECT" in error_msg.upper():
-            hint = "Network error. Check your connection and base_url config."
+def _try_generate(client, model, prompt, aspect_ratio):
+    """Attempt image generation with a single model. Returns (image_part, None) or (None, error_str)."""
+    from google.genai import types
 
-        result = {
-            "status": "error",
-            "error": error_msg,
-            "prompt": prompt,
-            "model": model,
-        }
-        if hint:
-            result["hint"] = hint
-        print(json.dumps(result, ensure_ascii=False))
-        sys.exit(1)
+    response = client.models.generate_content(
+        model=model,
+        contents=prompt,
+        config=types.GenerateContentConfig(
+            response_modalities=["IMAGE"],
+            image_config=types.ImageConfig(aspect_ratio=aspect_ratio),
+        ),
+    )
+
+    if not response.candidates or not response.candidates[0].content.parts:
+        return None, "No image generated. The model may have refused the prompt due to content policy."
+
+    for part in response.candidates[0].content.parts:
+        if part.inline_data and part.inline_data.mime_type.startswith("image/"):
+            return part, None
+
+    text_parts = [p.text for p in response.candidates[0].content.parts if hasattr(p, "text") and p.text]
+    error_msg = "No image in response."
+    if text_parts:
+        error_msg += f" Model said: {' '.join(text_parts)}"
+    return None, error_msg
 
 
 def cmd_generate(args):
-    """Generate an image from a text prompt."""
-    from google.genai import types
+    """Generate an image from a text prompt, with automatic model fallback."""
     from PIL import Image
     import io
 
     config = load_config(getattr(args, "config", None))
     client = get_client(config)
 
-    model = args.model or "gemini-3-pro-image-preview"
+    requested_model = args.model or DEFAULT_MODEL
     prompt = args.prompt
     aspect_ratio = args.aspect or "1:1"
+    no_fallback = getattr(args, "no_fallback", False)
 
     # Determine output path (default: current working directory)
     if args.output:
@@ -447,95 +524,86 @@ def cmd_generate(args):
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    try:
-        generate_config = types.GenerateContentConfig(
-            response_modalities=["IMAGE"],
-            image_config=types.ImageConfig(
-                aspect_ratio=aspect_ratio,
-            ),
-        )
+    # Build model attempt list
+    if no_fallback:
+        models_to_try = [requested_model]
+    else:
+        models_to_try = [requested_model] + _get_fallback_models(requested_model)
 
-        response = client.models.generate_content(
-            model=model,
-            contents=prompt,
-            config=generate_config,
-        )
+    tried = []
+    last_error = None
 
-        # Extract image from response
-        if not response.candidates or not response.candidates[0].content.parts:
-            print(json.dumps({
-                "status": "error",
-                "error": "No image generated. The model may have refused the prompt due to content policy.",
-                "prompt": prompt,
+    for model in models_to_try:
+        try:
+            image_part, gen_error = _try_generate(client, model, prompt, aspect_ratio)
+
+            if gen_error:
+                # Content policy / no image — not a server error, don't fallback
+                print(json.dumps({
+                    "status": "error",
+                    "error": gen_error,
+                    "prompt": prompt,
+                    "model": model,
+                }, ensure_ascii=False))
+                sys.exit(1)
+
+            # Success — save image
+            image = Image.open(io.BytesIO(image_part.inline_data.data))
+
+            if args.size:
+                try:
+                    w, h = map(int, args.size.split("x"))
+                    image = image.resize((w, h), Image.LANCZOS)
+                except ValueError:
+                    pass
+
+            image.save(str(output_path), "PNG")
+
+            result = {
+                "status": "ok",
+                "file": str(output_path),
                 "model": model,
-            }, ensure_ascii=False))
-            sys.exit(1)
+                "prompt": prompt,
+                "aspect_ratio": aspect_ratio,
+                "image_size": f"{image.width}x{image.height}",
+            }
+            if model != requested_model:
+                result["fallback_from"] = requested_model
+                result["models_tried"] = tried + [model]
+            print(json.dumps(result, ensure_ascii=False))
+            return
 
-        image_part = None
-        for part in response.candidates[0].content.parts:
-            if part.inline_data and part.inline_data.mime_type.startswith("image/"):
-                image_part = part
+        except Exception as e:
+            tried.append({"model": model, "error": str(e)[:150]})
+            last_error = e
+            # Only fallback on server errors
+            if not _is_server_error(e):
                 break
+            # Continue to next model in fallback chain
 
-        if not image_part:
-            # Check if there's a text response instead
-            text_parts = [p.text for p in response.candidates[0].content.parts if p.text]
-            error_msg = "No image in response."
-            if text_parts:
-                error_msg += f" Model said: {' '.join(text_parts)}"
-            print(json.dumps({
-                "status": "error",
-                "error": error_msg,
-                "prompt": prompt,
-                "model": model,
-            }, ensure_ascii=False))
-            sys.exit(1)
+    # All models failed
+    error_msg = str(last_error)
+    hint = ""
+    if "SAFETY" in error_msg.upper() or "BLOCKED" in error_msg.upper():
+        hint = "Content was blocked by safety filters. Try rephrasing the prompt."
+    elif "QUOTA" in error_msg.upper() or "429" in error_msg:
+        hint = "API quota exceeded. Wait a moment and try again."
+    elif "401" in error_msg or "403" in error_msg:
+        hint = "Authentication failed. Check your GEMINI_API_KEY config."
+    elif "TIMEOUT" in error_msg.upper() or "CONNECT" in error_msg.upper():
+        hint = "Network error. Check your connection and base_url config."
 
-        # Save image
-        image_data = image_part.inline_data.data
-        image = Image.open(io.BytesIO(image_data))
-
-        # Handle size parameter
-        if args.size:
-            try:
-                w, h = map(int, args.size.split("x"))
-                image = image.resize((w, h), Image.LANCZOS)
-            except ValueError:
-                pass
-
-        image.save(str(output_path), "PNG")
-
-        print(json.dumps({
-            "status": "ok",
-            "file": str(output_path),
-            "model": model,
-            "prompt": prompt,
-            "aspect_ratio": aspect_ratio,
-            "image_size": f"{image.width}x{image.height}",
-        }, ensure_ascii=False))
-
-    except Exception as e:
-        error_msg = str(e)
-        hint = ""
-        if "SAFETY" in error_msg.upper() or "BLOCKED" in error_msg.upper():
-            hint = "Content was blocked by safety filters. Try rephrasing the prompt."
-        elif "QUOTA" in error_msg.upper() or "429" in error_msg:
-            hint = "API quota exceeded. Wait a moment and try again."
-        elif "401" in error_msg or "403" in error_msg:
-            hint = "Authentication failed. Check your GEMINI_API_KEY config."
-        elif "TIMEOUT" in error_msg.upper() or "CONNECT" in error_msg.upper():
-            hint = "Network error. Check your connection and base_url config."
-
-        result = {
-            "status": "error",
-            "error": error_msg,
-            "prompt": prompt,
-            "model": model,
-        }
-        if hint:
-            result["hint"] = hint
-        print(json.dumps(result, ensure_ascii=False))
-        sys.exit(1)
+    result = {
+        "status": "error",
+        "error": error_msg,
+        "prompt": prompt,
+        "model": requested_model,
+        "models_tried": tried,
+    }
+    if hint:
+        result["hint"] = hint
+    print(json.dumps(result, ensure_ascii=False))
+    sys.exit(1)
 
 
 def main():
@@ -550,6 +618,7 @@ def main():
     gen_parser.add_argument("--aspect", "-a", help="Aspect ratio, e.g. 1:1, 16:9, 9:16 (default: 1:1)")
     gen_parser.add_argument("--size", "-s", help="Resize output to WxH, e.g. 1024x1024")
     gen_parser.add_argument("--output", "-o", help="Output file path (default: current directory)")
+    gen_parser.add_argument("--no-fallback", action="store_true", help="Disable automatic model fallback on server errors")
 
     # edit command
     edit_parser = subparsers.add_parser("edit", help="Edit an existing image with a text prompt")
@@ -558,6 +627,7 @@ def main():
     edit_parser.add_argument("--model", "-m", help="Model ID (default: gemini-3-pro-image-preview)")
     edit_parser.add_argument("--size", "-s", help="Resize output to WxH, e.g. 1024x1024")
     edit_parser.add_argument("--output", "-o", help="Output file path (default: current directory)")
+    edit_parser.add_argument("--no-fallback", action="store_true", help="Disable automatic model fallback on server errors")
 
     # models command
     subparsers.add_parser("models", help="List available models")
