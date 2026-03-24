@@ -5,3 +5,10 @@
 __pycache__/
 *.pyc
 .env
+
+# Auto-generated template registry
+.registry.json
+
+# Allow sample images in templates (override global image ignore)
+!references/templates/**/samples/*.jpg
+!references/templates/**/samples/*.png

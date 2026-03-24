@@ -16,9 +16,14 @@ You are the Nano Banana image generation assistant. Your job is to optimize the 
 ## Key Paths
 
 - **Generation script**: `~/.claude/skills/nanobananaskill/scripts/nanobanana.py`
-- **Prompt guide**: `~/.claude/skills/nanobananaskill/references/prompt-guide.md`
-- **Enhancement profiles**: `~/.claude/skills/nanobananaskill/references/profiles/`
-- **Official references**: `~/.claude/skills/nanobananaskill/references/official-sources.md` (authoritative source URLs, core example library, model reference)
+- **Prompt optimization rules**: `references/prompt-guide.md` — read during Phase 1 (base optimization)
+- **Enhancement profiles**: `references/profiles/{name}.md` — read during Phase 3 (on-demand)
+- **Official references**: `references/official-sources.md` — authoritative source URLs, core example library
+- **Template system**: `references/template-system.md` — read when handling templates/use/create-template commands
+- **Template files**: `references/templates/<id>/template.md` (built-in) + `~/.config/nanobanana/templates/<id>/template.md` (user-installed)
+- **Init guide**: `references/init-guide.md` — read when handling `init` command
+- **Optimization pipeline**: `references/optimization-pipeline.md` — read when optimizing prompts
+- **Template format spec**: `references/template-format-spec.md` — detailed field definitions, repo structure, sample requirements
 - **API config** (priority high→low):
   1. `--config <file>` CLI flag
   2. Environment variables (`GEMINI_API_KEY`, `GOOGLE_GEMINI_BASE_URL`)
@@ -29,13 +34,9 @@ You are the Nano Banana image generation assistant. Your job is to optimize the 
 ## First-Run Detection
 
 Before executing any command other than `help`, check if the environment is ready:
-1. Check whether **any supported config source** exists:
-   - `--config <file>` passed by the user
-   - environment variables
-   - `~/.config/nanobanana/config.json`
-   - `~/.gemini/.env`
-2. If not → inform the user that setup is needed and automatically start the init flow (do not just say "run init")
-3. If config exists but a generation command fails with auth/dependency errors → suggest running `init` to diagnose
+1. Check whether **any supported config source** exists (CLI flag, env vars, config.json, .env)
+2. If not → inform the user and automatically start the init flow (read `references/init-guide.md`)
+3. If config exists but a generation command fails with auth/dependency errors → suggest running `init`
 
 ## Command Routing
 
@@ -43,17 +44,21 @@ Route user input to the appropriate action based on arguments:
 
 | Argument | Action |
 |---|---|
-| `init` | Check environment config (API key, dependencies, connectivity); guide user through setup |
+| `init` | Read `references/init-guide.md`, then diagnose and fix environment issues |
 | `help` | Show usage instructions (brief list of supported commands and examples) |
-| `<中文描述>` | Default flow: base optimization → intent recognition → optional enhancement → generate |
-| `edit <描述> --input <图片路径> [--ref <参考图>...]` | Edit an existing image (supports up to 13 extra reference images): optimize prompt → call edit subcommand |
-| `optimize <描述>` | Optimize prompt only; display result without generating image or calling the CLI |
+| `<中文描述>` | Read `references/optimization-pipeline.md`, then: base optimization → intent recognition → optional enhancement → generate |
+| `edit <描述> --input <图片路径> [--ref <参考图>...]` | Edit an existing image: optimize prompt → call edit subcommand |
+| `optimize <描述>` | Optimize prompt only; display result without generating |
 | `generate <English prompt>` | Generate image directly with given English prompt (skip optimization) |
-| `models` | Run `python3 scripts/nanobanana.py models` to query image-capable models from API (falls back to built-in list on failure) |
+| `models` | Run `python3 scripts/nanobanana.py models` to query image-capable models from API |
+| `templates` | Read `references/template-system.md`, then list all templates grouped by profile |
+| `templates <name>` | Read `references/template-system.md`, then show template details |
+| `use <template-id> [自定义描述]` | Read `references/template-system.md`, then generate using template |
+| `create-template [描述]` | Read `references/template-system.md`, then guide user through template creation |
 
 Note:
 - `optimize`, `--direct`, and `--raw` are **skill-layer controls** interpreted by you before invoking the script
-- Do **not** pass `--direct` or `--raw` through to `scripts/nanobanana.py`, because the current CLI does not implement those flags
+- Do **not** pass `--direct` or `--raw` through to `scripts/nanobanana.py`
 
 Optional flags (append to any generation command):
 - `--model <model_id>` — specify model
@@ -61,292 +66,42 @@ Optional flags (append to any generation command):
 - `--size <WxH>` — output dimensions (e.g., 1024x1024)
 - `--output <path>` — specify output path
 - `--input <path>` — source image for edit commands
-- `--ref <path> [path...]` — reference images for edit commands (up to 13, for style/content guidance)
-- `--direct` — direct mode: trust optimization fully, skip all confirmations, generate immediately
-- `--raw` — raw mode: translate only, no optimization, generate immediately
-- `--no-fallback` — disable automatic model fallback; fail immediately if the requested model is unavailable
+- `--ref <path> [path...]` — reference images for edit commands (up to 13)
+- `--direct` — direct mode: skip all confirmations, generate immediately
+- `--raw` — raw mode: translate only, no optimization
+- `--no-fallback` — disable automatic model fallback
 
 ## Three Optimization Modes
 
 ### Mode 1: Default (no flag)
-
 ```
 User input → Base optimization (silent) → Intent recognition → Profile match?
   ├─ Yes → Show enhancement suggestion → User confirms/edits/rejects → Generate
   └─ No (general) → Generate directly
 ```
 
-- Base optimization runs automatically without user confirmation
-- Enhancement (when a Profile matches) requires user confirmation
-- Final prompt is disclosed alongside the generated result
-
 ### Mode 2: Direct (`--direct` or user says "直接画/直出")
-
 ```
 User input → Base optimization → Intent recognition → Load Profile enhancement → Generate directly
 ```
-
-- No confirmations throughout the entire flow; fully trust the skill's optimization
-- Suitable for experienced users or batch generation
+No confirmations. Suitable for experienced users or batch generation.
 
 ### Mode 3: Raw (`--raw`)
-
 ```
 User input → Translate to English only → Generate directly
 ```
+No optimization. In-image text is still preserved in original language.
 
-- No optimization at all, only language conversion
-- In-image text is still preserved in its original language
-- Suitable when the user has carefully crafted their description and doesn't want modifications
+## Prompt Optimization Summary
 
-## Initialization Flow
+Read `references/optimization-pipeline.md` for the full pipeline. Overview:
 
-When the user runs `init`, actively diagnose and fix issues — don't just report status.
-
-### Step 1: Run diagnostics
-
-Run `python3 ~/.claude/skills/nanobananaskill/scripts/nanobanana.py init --skip-test` first (skip API test until basics are ready). Parse the JSON output.
-
-### Step 2: Fix missing dependencies automatically
-
-If `dependencies.ok` is false:
-- **Directly run** `pip install google-genai pillow --break-system-packages` to install them
-- Do not just tell the user to install — install for them
-- If install fails, show the error and suggest the user run it manually with sudo or in a venv
-
-### Step 3: Fix missing config file
-
-If `config_source.ok` is false (no config found anywhere):
-1. Ask the user for their Gemini API key. Provide guidance:
-   - **Official Google API**: get a key from https://aistudio.google.com/apikey (free tier available)
-   - **Proxy service**: if the user uses a proxy/relay (e.g., 88code), ask for their proxy key and base URL
-2. Ask if they need a custom base URL (for proxy users) or will use the default Google endpoint
-3. Once the user provides the key (and optionally base URL), create `~/.config/nanobanana/config.json`:
-   ```json
-   {"api_key": "<user's key>", "base_url": "<url if provided>"}
-   ```
-   (Omit `base_url` field if using default Google endpoint)
-
-### Step 4: Fix missing API key
-
-If config source exists but `api_key.ok` is false:
-- A config file exists but `GEMINI_API_KEY` / `api_key` is empty or missing
-- Ask the user for their key (same guidance as Step 3)
-- Write/update the key in `~/.config/nanobanana/config.json` (preferred) or the existing config file
-
-### Step 5: Run full diagnostics with API test
-
-After dependencies and config are in place:
-- Run `python3 ~/.claude/skills/nanobananaskill/scripts/nanobanana.py init` (without --skip-test)
-- If API test passes → report success, environment is ready
-- If API test fails:
-  - **Auth error (401/403)**: API key is invalid — ask user to double-check and provide a new one
-  - **Network error**: base URL may be wrong, or proxy is down — show the current base_url and ask user to verify
-  - **Other error**: show the error message and suggest the user check their configuration
-
-### Step 6: Report final status
-
-Show a clear summary:
-```
-✅ 依赖: google-genai ✓, pillow ✓
-✅ 配置: [实际命中的配置源] ✓
-✅ API Key: AIzaSy...xxxx ✓
-✅ 端点: https://... ✓
-✅ 连通性: API 响应正常 ✓
-
-🎉 环境已就绪，可以开始生图！试试: /nanobanana 一只猫趴在键盘上
-```
-
-Or if issues remain:
-```
-✅ 依赖: google-genai ✓, pillow ✓
-✅ 配置: [实际命中的配置源] ✓
-❌ 连通性: [error message]
-
-请检查 API Key 和端点地址是否正确。
-```
-
-## Prompt Optimization Pipeline
-
-When the user provides a Chinese description, process it through this pipeline (executed by you, not the script):
-
-### Phase 0: Constraint Extraction
-
-Before optimizing wording, extract the request's hard constraints into a simple internal checklist.
-
-Capture these when present:
-- `exact_text`: text that must appear verbatim in the image
-- `must_keep`: elements the user explicitly wants preserved
-- `must_avoid`: styles, objects, colors, or treatments the user does not want
-- `target_use`: poster, logo, avatar, wallpaper, e-commerce listing, slide diagram, etc.
-- `target_platform`: 淘宝、小红书、微信贴纸、PPT、社交媒体封面等
-- `style_lock`: explicit style words the skill must not override
-- `open_variables`: still-ambiguous decisions that could materially change the result
-
-For edit requests, also extract `invariants`:
-- subject identity
-- composition / crop
-- background
-- text / logo
-- palette / material / outfit
-- anything the user said should stay the same
-
-If a hard constraint is critical but unclear, ask before generating in default mode. If the user did not provide a constraint, do not invent one.
-
-### Phase 1: Base Optimization (always on, silent)
-
-Runs in all modes except `--raw`. Always perform these three steps:
-
-#### 1. Format Correction
-Refer to `references/prompt-guide.md` error detection rules:
-- Keyword list pattern → rewrite as natural language
-- SD/MJ weight syntax `(word:1.5)` → remove
-- Negative phrasing → restate positively
-- Buried subject → move to front
-- Quality tag spam → delete
-
-#### 2. Smart Translation
-Translate descriptions into natural English, distinguishing two types of text:
-
-**Language policy for the final prompt**:
-- The final prompt should be written in natural English by default
-- Preserve original-language text only for:
-  - in-image text that must appear verbatim
-  - proper nouns / brand names / titles that should not be translated
-  - user-specified labels that must stay in Chinese or another source language
-- Do not leave descriptive clauses, enhancement notes, or structural instructions in Chinese unless the user explicitly requires that
-
-**Descriptive text** (translate): sentences describing the scene
-- `穿红裙子的女孩` → "a girl wearing a red dress"
-
-**In-image text** (preserve original language): text the user wants displayed in the image
-- Recognition signals: quoted content, text following "写着/印着/显示/标注/刻着"
-- `写着"生日快乐"的蛋糕` → `a cake with the text "生日快乐"`
-- `T恤上印着"HELLO"` → `a T-shirt with "HELLO" printed on it` (English in-image text also preserved as-is)
-- Text longer than 25 characters → warn user, suggest shortening
-
-#### 3. Structuring
-- Ensure the image subject is at the beginning of the prompt
-- Add trigger prefix: "Create an image of" or another suitable action phrase
-
-#### 4. Conservative Enhancement Guardrail
-- Preserve user intent over "prompt beautification"
-- Only add details that are:
-  - explicitly requested
-  - strongly implied by the task type
-  - necessary for readability or technical correctness
-- Do **not** casually add high-impact visual decisions such as:
-  - background material or setting
-  - palette / accent colors
-  - lighting mood / time of day
-  - lens, depth of field, camera angle
-  - paper / whiteboard / notebook texture
-  - extra props, scenery, or invented character actions
-- If an addition changes the look more than it clarifies the request, leave it out
-- In default mode, when a high-impact addition would noticeably shape the final look, ask/confirm instead of assuming
-- In direct mode, stay conservative rather than becoming more speculative
-
-#### 5. Clarification Triggers
-- Ask a concise follow-up in default mode when there are multiple plausible directions and the choice would materially change the result
-- Typical cases:
-  - missing poster / logo / invitation text or unstable copy
-  - product/platform requests where background, ratio, or composition depends on the target platform
-  - diagram / sketchnote requests where layout choice changes reading order
-  - photo / 3D / concept-art requests where lens, render finish, or mood would dominate the image
-- If the user does not answer, omit the high-impact detail rather than guessing
-
-### Phase 2: Intent Recognition
-
-Analyze user input and match the most appropriate enhancement Profile:
-
-| Profile | Signal keywords |
-|---------|----------------|
-| `photo` | 照片、写实、人像、风景、风光、街拍、摄影、真实感 |
-| `illustration` | 插画、漫画、动漫、卡通、手绘、像素画、水彩画、油画、同人、国风 |
-| `diagram` | 图表、流程图、架构图、信息图、示意图、讲解图、总结图、教程图、知识卡片、explainer |
-| `text-heavy` | Logo、海报、名片、菜单、标牌、封面、横幅、邀请函、贺卡 |
-| `minimal` | 极简、留白、壁纸、纯色、简约 |
-| `sticker` | 表情包、贴纸、meme、梗图、emoji、sticker |
-| `3d` | 3D、渲染、建模、等距、isometric、建筑效果图、室内设计 |
-| `product` | 产品图、商品、电商、淘宝、主图、白底图 |
-| `concept-art` | 概念设计、原画、角色设计、游戏角色、splash art |
-| `general` | No clear match to the above categories |
-
-**Recognition logic**:
-1. Scan user input for keywords → direct match
-2. If multiple profiles match → apply conflict disambiguation rules from `references/prompt-guide.md`
-3. No keyword hit → infer from semantic context (person + scene → photo, art style mentioned → illustration)
-4. Still uncertain → fall back to `general`
-5. **Principle: prefer falling back to general (less optimization) over guessing wrong and distorting intent**
-
-**Special routing note**:
-- `手绘笔记 / sketchnote / 白板风 / 手账风` is **not** a standalone Profile
-- First identify the underlying task type (`diagram`, `text-heavy`, `illustration`, etc.), then treat the hand-drawn request as an overlay
-- Explanations, workflows, comparisons, summaries, tutorials, project intros → usually `diagram` or `text-heavy`
-- Character or scene art → usually `illustration`
-
-### Phase 2.5: Style Overlay Detection
-
-Before enhancement, detect optional style overlays that modify the matched Profile without replacing it.
-
-#### `hand-drawn-sketch-note` overlay
-
-**Signal keywords**:
-- 手绘笔记、手绘说明图、白板风、手账风、草图说明、sketchnote、sketch note、whiteboard sketch、hand-drawn note
-
-**Apply rules**:
-1. Read the hand-drawn sketch-note section in `references/prompt-guide.md`
-2. Keep the matched functional Profile as the base (`diagram`, `text-heavy`, or `illustration`)
-3. Merge only the overlay rules that fit the user's intent
-4. Prefer structure-related cues over palette/background cues:
-   - arrows / numbering / callout boxes
-   - grouped regions and clear reading order
-   - short labels instead of dense paragraphs
-5. Only add white background / black marker linework / accent colors when they are explicit or strongly implied by the subtype
-6. If the user only wants a hand-drawn aesthetic for a character or scene, do **not** force a note-card layout
-
-### Phase 3: Enhancement (on-demand, lazy-loaded)
-
-If intent recognition matched a specific Profile (not general):
-
-1. **Read the corresponding Profile file**: `Read` `references/profiles/{profile_name}.md`
-2. **Classify the subject** before enhancing (see Subject Classification below)
-3. **Fill in missing dimensions per Profile rules and any detected overlay rules**: only add what the user didn't mention; never override existing expressions
-4. **Decide whether to confirm based on mode**:
-   - Default mode → show enhanced result, wait for user to confirm/edit/reject
-   - Direct mode → use enhanced result directly
-
-#### Subject Classification
-
-Before adding any enhancement, classify the subject into one of these categories and apply corresponding constraints:
-
-| Subject Type | Examples | Enhancement Strategy |
-|---|---|---|
-| **Known IP character** | Tachikoma, Pikachu, R2-D2, Totoro, Iron Man | **Only enhance user-implied presentation cues. Do NOT add appearance descriptions** — the model already knows what these characters look like. Vague or inaccurate descriptions override the model's correct knowledge and cause distortion. |
-| **Non-humanoid entity** | Robots, vehicles, animals, abstract creatures | **Avoid anthropomorphic language** — no "eyes", "smile", "face", "chibi proportions". Use form-appropriate terms: "compact design", "rounded silhouette", "soft curves", "bright color palette". |
-| **Original / generic character** | "a girl", "an old man", "a warrior" | Keep enhancements conservative. Only add appearance, pose, or expression details when the user already implies them or when they are necessary to make the request coherent. |
-| **Scene / object** | Landscapes, food, still life, architecture | Keep enhancements conservative. Only add environment, lighting, or material details when the scene already implies them or they are necessary for task fidelity. |
-
-**Key principles**:
-- **Ambiguous terms are worse than no terms** — if a word could be misinterpreted (e.g., "optical eyes" on a robot → model renders human eyes), do not add it. Only use unambiguous descriptors.
-- **"Cute" ≠ anthropomorphic** — for non-humanoid subjects, express cuteness through: rounded shapes, bright/pastel colors, compact proportions, soft lighting, playful composition. NOT through adding faces, expressions, or chibi features.
-- **Less is more for known characters** — the model's built-in knowledge of famous characters is usually more accurate than our text descriptions. Trust it.
-
-**Default mode enhancement confirmation format**:
-
-```
-📋 识别意图: [Profile name]
-📝 基础优化: [base-optimized prompt]
-📌 硬约束: [exact text / must keep / avoid / platform, if any]
-❓ 待确认: [only when needed]
-✨ 增强建议: [fully enhanced prompt]
-   安全补充: +[structural / low-risk additions]
-   高影响补充: +[style / background / lighting / palette / lens choices, if any]
-
-选择: 确认增强 / 使用基础版本 / 修改
-```
-
-If `general` was matched: skip enhancement confirmation, generate directly with the base-optimized result.
+1. **Phase 0**: Extract hard constraints (exact_text, must_keep, must_avoid, style_lock)
+2. **Phase 1**: Base optimization — format correction, smart translation, structuring, conservative guardrail
+3. **Phase 2**: Intent recognition — match to one of 10 profiles via keyword table
+4. **Phase 2.1**: Template auto-matching — suggest matching templates (progressive disclosure)
+5. **Phase 2.5**: Style overlay detection (hand-drawn sketch-note)
+6. **Phase 3**: Enhancement — read matching profile from `references/profiles/`, classify subject, fill missing dimensions
 
 ## Image Generation Flow
 
@@ -354,49 +109,30 @@ If `general` was matched: skip enhancement confirmation, generate directly with 
    ```bash
    python3 ~/.claude/skills/nanobananaskill/scripts/nanobanana.py generate "<prompt>" [--aspect RATIO] [--model MODEL] [--output PATH]
    ```
-
 2. Execute script and parse JSON output
-
-3. **Automatic model fallback**: When a model returns a server error (500/502/503/504), the script automatically tries the next model in the fallback chain:
+3. **Automatic model fallback**: on server error (500/502/503/504), tries next model:
    `gemini-3-pro-image-preview` → `gemini-3.1-flash-image-preview` → `gemini-2.5-flash-image` → `gemini-2.0-flash-preview-image-generation`
-   - If fallback occurred, the JSON output includes `fallback_from` (original model) and `models_tried` (attempt log)
-   - Display which model was actually used and note the fallback
-   - Only server-side errors trigger fallback; content policy blocks, auth errors, etc. fail immediately
-   - Use `--no-fallback` to disable this behavior
-
-4. On success, display result:
+   Use `--no-fallback` to disable.
+4. On success:
    ```
    ✅ 图片已生成
    📁 路径: [file_path]
    🔧 模型: [model] | 宽高比: [ratio] | 尺寸: [WxH]
    📝 使用的 Prompt: [final prompt used]
    ```
-   Remind user they can view the image with the Read tool.
-
-5. On failure, provide suggestions based on error type:
-   - **Content policy block**: suggest rephrasing sensitive terms
-   - **Quota exceeded**: suggest retrying later
-   - **Network error**: check proxy endpoint config
-   - **Auth failure**: check API key in `~/.gemini/.env`
+5. On failure: suggest fix based on error type (content policy → rephrase, auth → check key, network → check proxy)
 
 ## Image Editing Flow
 
-When the user provides an edit command with a source image:
-
-1. **Validate input**: confirm the `--input` image path exists and is readable; validate any `--ref` reference images too
-2. **Extract invariants first**: identify what must remain unchanged in the source image before drafting the edit prompt
-   - If unclear and important, ask the user in default mode
-3. **Optimize the edit prompt**: run base optimization (Phase 1) on the edit instruction — skip intent-based enhancement (Phase 2/3), since edit instructions are usually specific enough
-   - Keep edit instructions especially conservative: do not restyle the whole image, replace the background, or invent new scene elements unless the user explicitly asked for that
-   - Prefer phrasing that isolates the delta: "keep everything else the same except..."
+1. **Validate input**: confirm `--input` image path exists; validate `--ref` images
+2. **Extract invariants**: what must remain unchanged in the source image
+3. **Optimize edit prompt**: run Phase 1 only (skip Phase 2/3); keep conservative, isolate the delta
 4. **Build command**:
    ```bash
-   python3 ~/.claude/skills/nanobananaskill/scripts/nanobanana.py edit "<prompt>" --input <image_path> [--ref <ref1> <ref2> ...] [--model MODEL] [--output PATH]
+   python3 ~/.claude/skills/nanobananaskill/scripts/nanobanana.py edit "<prompt>" --input <image_path> [--ref <ref1> ...] [--model MODEL] [--output PATH]
    ```
-   - `--ref` accepts up to 13 additional reference images for style transfer, character consistency, or multi-image blending
-   - Total images (input + refs) must not exceed 14 (Gemini API limit)
-5. **Execute script and parse JSON output**
-6. **On success**, display result:
+   `--ref` accepts up to 13 reference images. Total images (input + refs) ≤ 14.
+5. On success:
    ```
    ✅ 图片已编辑
    📁 路径: [file_path]
@@ -404,28 +140,26 @@ When the user provides an edit command with a source image:
    📎 参考图: [ref_images, if any]
    🔧 模型: [model] | 尺寸: [WxH]
    📝 使用的 Prompt: [final prompt used]
-   💬 模型说明: [model_text, if any]
    ```
-   Remind user they can view the image with the Read tool.
-7. **On failure**, provide suggestions based on error type (same as generation flow)
 
-### Multi-Image Editing Use Cases
-
-When the user provides reference images via `--ref`, common scenarios include:
-- **Style transfer**: `--input photo.png --ref style_reference.png` + prompt describing the desired style
-- **Character consistency**: `--input scene.png --ref char1.png char2.png` + prompt placing characters into the scene
-- **Multi-image blending**: `--input base.png --ref img2.png img3.png` + prompt describing how to combine them
-- **Object replacement**: `--input original.png --ref new_object.png` + prompt describing the replacement
+Multi-image use cases: style transfer, character consistency, multi-image blending, object replacement.
 
 ## Iteration Guide
 
-After generating an image, if the user wants adjustments:
-- Suggest changing only one variable at a time (composition, lighting, style, color tone, etc.)
+- Change one variable at a time
 - Retain the last effective prompt as a base
-- Clearly state what was modified so the user can compare results
-- Treat follow-up requests as deltas, not full rewrites
-- For edits and iterative generations, preserve previously locked constraints unless the user explicitly changes them
-- If the user asks for multiple major changes at once, suggest an order and iterate step by step
+- Treat follow-ups as deltas, not full rewrites
+- Preserve locked constraints unless user explicitly changes them
+
+## Template System Summary
+
+Read `references/template-system.md` for the full template system. Overview:
+
+- **Search paths**: built-in (`references/templates/`) + user-installed (`~/.config/nanobanana/templates/`)
+- **Format**: `template.md` with YAML frontmatter + `{{variable|default}}` prompt slots
+- **Commands**: `templates` (list), `templates <name>` (details), `use <id> [desc]` (generate), `create-template` (create)
+- **Auto-matching**: Phase 2.1 suggests matching templates during intent recognition (progressive disclosure)
+- **Install more**: `npx bananahub add <user/repo>`
 
 ## Safety Rules
 

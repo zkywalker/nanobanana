@@ -412,15 +412,8 @@ def cmd_edit(args):
     prompt = args.prompt
     no_fallback = getattr(args, "no_fallback", False)
 
-    # Determine output path
-    if args.output:
-        output_path = Path(args.output)
-    else:
-        output_dir = Path.cwd()
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_path = output_dir / f"nanobanana_edit_{timestamp}.png"
-
-    output_path.parent.mkdir(parents=True, exist_ok=True)
+    # Determine output path (deferred until model is known)
+    user_output = args.output
 
     # Build model attempt list
     if no_fallback:
@@ -444,7 +437,18 @@ def cmd_edit(args):
                 }, ensure_ascii=False))
                 sys.exit(1)
 
-            # Success — save image
+            # Success — resolve output path now that we know the actual model
+            if user_output:
+                output_path = Path(user_output)
+            else:
+                output_dir = Path.cwd()
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                model_short = model.replace("gemini-", "").replace("-preview", "").replace("-image-generation", "")
+                output_path = output_dir / f"nanobanana_edit_{model_short}_{timestamp}.png"
+
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+
+            # Save image
             image = Image.open(io.BytesIO(image_part.inline_data.data))
 
             if args.size:
@@ -546,15 +550,8 @@ def cmd_generate(args):
     aspect_ratio = args.aspect or "1:1"
     no_fallback = getattr(args, "no_fallback", False)
 
-    # Determine output path (default: current working directory)
-    if args.output:
-        output_path = Path(args.output)
-    else:
-        output_dir = Path.cwd()
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_path = output_dir / f"nanobanana_{timestamp}.png"
-
-    output_path.parent.mkdir(parents=True, exist_ok=True)
+    # Determine output path (default: current working directory with model name)
+    user_output = args.output
 
     # Build model attempt list
     if no_fallback:
@@ -579,7 +576,18 @@ def cmd_generate(args):
                 }, ensure_ascii=False))
                 sys.exit(1)
 
-            # Success — save image
+            # Success — resolve output path now that we know the actual model
+            if user_output:
+                output_path = Path(user_output)
+            else:
+                output_dir = Path.cwd()
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                model_short = model.replace("gemini-", "").replace("-preview", "").replace("-image-generation", "")
+                output_path = output_dir / f"nanobanana_{model_short}_{timestamp}.png"
+
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+
+            # Save image
             image = Image.open(io.BytesIO(image_part.inline_data.data))
 
             if args.size:
