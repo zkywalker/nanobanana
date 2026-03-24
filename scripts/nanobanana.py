@@ -411,6 +411,7 @@ def cmd_edit(args):
     requested_model = args.model or DEFAULT_MODEL
     prompt = args.prompt
     no_fallback = getattr(args, "no_fallback", False)
+    retries = getattr(args, "retries", 1)
 
     # Determine output path (deferred until model is known)
     user_output = args.output
@@ -425,65 +426,76 @@ def cmd_edit(args):
     last_error = None
 
     for model in models_to_try:
-        try:
-            image_part, text_parts, gen_error = _try_edit(client, model, prompt, input_images)
+        for attempt in range(1 + retries):
+            try:
+                image_part, text_parts, gen_error = _try_edit(client, model, prompt, input_images)
 
-            if gen_error:
-                print(json.dumps({
-                    "status": "error",
-                    "error": gen_error,
-                    "prompt": prompt,
+                if gen_error:
+                    print(json.dumps({
+                        "status": "error",
+                        "error": gen_error,
+                        "prompt": prompt,
+                        "model": model,
+                    }, ensure_ascii=False))
+                    sys.exit(1)
+
+                # Success — resolve output path now that we know the actual model
+                if user_output:
+                    output_path = Path(user_output)
+                else:
+                    output_dir = Path.cwd()
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    model_short = model.replace("gemini-", "").replace("-preview", "").replace("-image-generation", "")
+                    output_path = output_dir / f"nanobanana_edit_{model_short}_{timestamp}.png"
+
+                output_path.parent.mkdir(parents=True, exist_ok=True)
+
+                # Save image
+                image = Image.open(io.BytesIO(image_part.inline_data.data))
+
+                if args.size:
+                    try:
+                        w, h = map(int, args.size.split("x"))
+                        image = image.resize((w, h), Image.LANCZOS)
+                    except ValueError:
+                        pass
+
+                image.save(str(output_path), "PNG")
+
+                result = {
+                    "status": "ok",
+                    "file": str(output_path),
+                    "input": str(input_path),
                     "model": model,
-                }, ensure_ascii=False))
-                sys.exit(1)
+                    "prompt": prompt,
+                    "image_size": f"{image.width}x{image.height}",
+                    "total_images": len(input_images),
+                }
+                if ref_paths:
+                    result["ref_images"] = [str(rp) for rp in ref_paths]
+                if model != requested_model:
+                    result["fallback_from"] = requested_model
+                    result["models_tried"] = tried + [model]
+                if text_parts:
+                    result["model_text"] = " ".join(text_parts)
+                print(json.dumps(result, ensure_ascii=False))
+                return
 
-            # Success — resolve output path now that we know the actual model
-            if user_output:
-                output_path = Path(user_output)
-            else:
-                output_dir = Path.cwd()
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                model_short = model.replace("gemini-", "").replace("-preview", "").replace("-image-generation", "")
-                output_path = output_dir / f"nanobanana_edit_{model_short}_{timestamp}.png"
-
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-
-            # Save image
-            image = Image.open(io.BytesIO(image_part.inline_data.data))
-
-            if args.size:
-                try:
-                    w, h = map(int, args.size.split("x"))
-                    image = image.resize((w, h), Image.LANCZOS)
-                except ValueError:
-                    pass
-
-            image.save(str(output_path), "PNG")
-
-            result = {
-                "status": "ok",
-                "file": str(output_path),
-                "input": str(input_path),
-                "model": model,
-                "prompt": prompt,
-                "image_size": f"{image.width}x{image.height}",
-                "total_images": len(input_images),
-            }
-            if ref_paths:
-                result["ref_images"] = [str(rp) for rp in ref_paths]
-            if model != requested_model:
-                result["fallback_from"] = requested_model
-                result["models_tried"] = tried + [model]
-            if text_parts:
-                result["model_text"] = " ".join(text_parts)
-            print(json.dumps(result, ensure_ascii=False))
-            return
-
-        except Exception as e:
-            tried.append({"model": model, "error": str(e)[:150]})
-            last_error = e
-            if not _is_server_error(e):
-                break
+            except Exception as e:
+                last_error = e
+                if not _is_server_error(e):
+                    tried.append({"model": model, "error": str(e)[:150]})
+                    break
+                if attempt < retries:
+                    import time
+                    delay = 2 ** (attempt + 1)
+                    tried.append({"model": model, "error": str(e)[:150], "retry": attempt + 1, "delay_s": delay})
+                    time.sleep(delay)
+                else:
+                    tried.append({"model": model, "error": str(e)[:150]})
+        else:
+            continue
+        break
 
     # All models failed
     error_msg = str(last_error)
@@ -502,6 +514,7 @@ def cmd_edit(args):
         "error": error_msg,
         "prompt": prompt,
         "model": requested_model,
+        "retries_per_model": retries,
         "models_tried": tried,
     }
     if hint:
@@ -549,6 +562,7 @@ def cmd_generate(args):
     prompt = args.prompt
     aspect_ratio = args.aspect or "1:1"
     no_fallback = getattr(args, "no_fallback", False)
+    retries = getattr(args, "retries", 1)
 
     # Determine output path (default: current working directory with model name)
     user_output = args.output
@@ -563,63 +577,76 @@ def cmd_generate(args):
     last_error = None
 
     for model in models_to_try:
-        try:
-            image_part, gen_error = _try_generate(client, model, prompt, aspect_ratio)
+        # Retry same model up to (1 + retries) times before fallback
+        for attempt in range(1 + retries):
+            try:
+                image_part, gen_error = _try_generate(client, model, prompt, aspect_ratio)
 
-            if gen_error:
-                # Content policy / no image — not a server error, don't fallback
-                print(json.dumps({
-                    "status": "error",
-                    "error": gen_error,
-                    "prompt": prompt,
+                if gen_error:
+                    # Content policy / no image — not a server error, don't fallback
+                    print(json.dumps({
+                        "status": "error",
+                        "error": gen_error,
+                        "prompt": prompt,
+                        "model": model,
+                    }, ensure_ascii=False))
+                    sys.exit(1)
+
+                # Success — resolve output path now that we know the actual model
+                if user_output:
+                    output_path = Path(user_output)
+                else:
+                    output_dir = Path.cwd()
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    model_short = model.replace("gemini-", "").replace("-preview", "").replace("-image-generation", "")
+                    output_path = output_dir / f"nanobanana_{model_short}_{timestamp}.png"
+
+                output_path.parent.mkdir(parents=True, exist_ok=True)
+
+                # Save image
+                image = Image.open(io.BytesIO(image_part.inline_data.data))
+
+                if args.size:
+                    try:
+                        w, h = map(int, args.size.split("x"))
+                        image = image.resize((w, h), Image.LANCZOS)
+                    except ValueError:
+                        pass
+
+                image.save(str(output_path), "PNG")
+
+                result = {
+                    "status": "ok",
+                    "file": str(output_path),
                     "model": model,
-                }, ensure_ascii=False))
-                sys.exit(1)
+                    "prompt": prompt,
+                    "aspect_ratio": aspect_ratio,
+                    "image_size": f"{image.width}x{image.height}",
+                }
+                if model != requested_model:
+                    result["fallback_from"] = requested_model
+                    result["models_tried"] = tried + [model]
+                print(json.dumps(result, ensure_ascii=False))
+                return
 
-            # Success — resolve output path now that we know the actual model
-            if user_output:
-                output_path = Path(user_output)
-            else:
-                output_dir = Path.cwd()
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                model_short = model.replace("gemini-", "").replace("-preview", "").replace("-image-generation", "")
-                output_path = output_dir / f"nanobanana_{model_short}_{timestamp}.png"
-
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-
-            # Save image
-            image = Image.open(io.BytesIO(image_part.inline_data.data))
-
-            if args.size:
-                try:
-                    w, h = map(int, args.size.split("x"))
-                    image = image.resize((w, h), Image.LANCZOS)
-                except ValueError:
-                    pass
-
-            image.save(str(output_path), "PNG")
-
-            result = {
-                "status": "ok",
-                "file": str(output_path),
-                "model": model,
-                "prompt": prompt,
-                "aspect_ratio": aspect_ratio,
-                "image_size": f"{image.width}x{image.height}",
-            }
-            if model != requested_model:
-                result["fallback_from"] = requested_model
-                result["models_tried"] = tried + [model]
-            print(json.dumps(result, ensure_ascii=False))
-            return
-
-        except Exception as e:
-            tried.append({"model": model, "error": str(e)[:150]})
-            last_error = e
-            # Only fallback on server errors
-            if not _is_server_error(e):
-                break
-            # Continue to next model in fallback chain
+            except Exception as e:
+                last_error = e
+                if not _is_server_error(e):
+                    tried.append({"model": model, "error": str(e)[:150]})
+                    break
+                # Retry same model with exponential backoff
+                if attempt < retries:
+                    import time
+                    delay = 2 ** (attempt + 1)
+                    tried.append({"model": model, "error": str(e)[:150], "retry": attempt + 1, "delay_s": delay})
+                    time.sleep(delay)
+                else:
+                    tried.append({"model": model, "error": str(e)[:150]})
+        else:
+            # Inner loop completed without break — all retries exhausted, try next model
+            continue
+        # Inner loop was broken (non-server error) — stop trying
+        break
 
     # All models failed
     error_msg = str(last_error)
@@ -638,6 +665,7 @@ def cmd_generate(args):
         "error": error_msg,
         "prompt": prompt,
         "model": requested_model,
+        "retries_per_model": retries,
         "models_tried": tried,
     }
     if hint:
@@ -659,6 +687,7 @@ def main():
     gen_parser.add_argument("--size", "-s", help="Resize output to WxH, e.g. 1024x1024")
     gen_parser.add_argument("--output", "-o", help="Output file path (default: current directory)")
     gen_parser.add_argument("--no-fallback", action="store_true", help="Disable automatic model fallback on server errors")
+    gen_parser.add_argument("--retries", type=int, default=1, help="Retry count per model on 503 before fallback (default: 1)")
 
     # edit command
     edit_parser = subparsers.add_parser("edit", help="Edit an existing image with a text prompt")
@@ -669,6 +698,7 @@ def main():
     edit_parser.add_argument("--size", "-s", help="Resize output to WxH, e.g. 1024x1024")
     edit_parser.add_argument("--output", "-o", help="Output file path (default: current directory)")
     edit_parser.add_argument("--no-fallback", action="store_true", help="Disable automatic model fallback on server errors")
+    edit_parser.add_argument("--retries", type=int, default=1, help="Retry count per model on 503 before fallback (default: 1)")
 
     # models command
     subparsers.add_parser("models", help="List available models")

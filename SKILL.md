@@ -69,6 +69,7 @@ Optional flags (append to any generation command):
 - `--ref <path> [path...]` — reference images for edit commands (up to 13)
 - `--direct` — direct mode: skip all confirmations, generate immediately
 - `--raw` — raw mode: translate only, no optimization
+- `--retries <N>` — retry count per model on 503 before fallback (default: 1, i.e. try each model twice)
 - `--no-fallback` — disable automatic model fallback
 
 ## Three Optimization Modes
