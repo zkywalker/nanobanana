@@ -161,6 +161,7 @@ Read `references/template-system.md` for the full template system. Overview:
 - **Commands**: `templates` (list), `templates <name>` (details), `use <id> [desc]` (generate), `create-template` (create)
 - **Auto-matching**: Phase 2.1 suggests matching templates during intent recognition (progressive disclosure)
 - **Install more**: `npx bananahub add <user/repo>`
+- **Publishing rule**: when creating templates, save samples as `sample-{model-short}-{nn}.png` and make README list verified models, supported models, and sample-to-prompt mappings
 
 ## Safety Rules
 

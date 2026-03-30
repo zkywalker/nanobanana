@@ -179,6 +179,13 @@ npx bananahub add <username>/<repo>
 
 模板格式使用 `{{变量名|默认值}}` 占位符，并配合变量表和 tips 区块。完整规范见 `references/template-format-spec.md`。
 
+发布前检查：
+
+- 每张样图文件名都带上生成模型缩写，比如 `sample-3-pro-01.png`
+- `template.md` 里的样图元数据要写全：`file`、`model`、`prompt`、`aspect`
+- `README.md` 必须明确写出 `Verified Models`、`Supported Models`、`Sample Outputs`
+- `Sample Outputs` 里把每张样图和对应模型、对应 prompt 或变体说明一一对应起来
+
 ## Prompt 优化是怎么做的
 
 ```text

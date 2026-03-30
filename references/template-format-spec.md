@@ -11,9 +11,9 @@ A template repo can contain one or multiple templates:
 /
 ├── template.md              # Required: template definition
 ├── samples/                 # Required: at least 1 sample image
-│   ├── sample-01.jpg
-│   └── sample-02.png
-├── README.md                # Optional
+│   ├── sample-3-pro-01.jpg
+│   └── sample-3.1-flash-01.png
+├── README.md                # Required for published/community templates
 └── LICENSE                  # Optional
 ```
 
@@ -142,8 +142,42 @@ Rules:
 | Format | JPG or PNG |
 | Max size | 2MB per image |
 | Naming | `sample-{model-short}-{nn}.png`, e.g. `sample-3.1-flash-01.png`, `sample-3-pro-01.png` |
-| Metadata | Each sample MUST have `model` and `prompt` in frontmatter |
+| Metadata | Each sample MUST have `file`, `model`, `prompt`, and `aspect` in frontmatter |
+| Mapping | One sample = one exact prompt/model variant; don't reuse a sample for unrelated example prompts |
 | Purpose | Show what the template produces; Hub displays as preview cards |
+
+The file name is not cosmetic. It is the fastest way for users and agents to tell which model produced the image when browsing a repo or catalog.
+
+## README Requirements
+
+Published/community template repos should include a `README.md` with at least these sections:
+
+```markdown
+## Install
+## Verified Models
+## Supported Models
+## Sample Outputs
+```
+
+Recommended `README.md` pattern:
+
+```markdown
+## Verified Models
+- `gemini-3-pro-image-preview` — verified with `samples/sample-3-pro-01.png`
+
+## Supported Models
+- `gemini-3.1-flash-image-preview` — expected good, not yet manually verified
+
+## Sample Outputs
+| File | Model | Prompt / Variant |
+|---|---|---|
+| `samples/sample-3-pro-01.png` | `gemini-3-pro-image-preview` | Default prompt |
+```
+
+Rules:
+- If README shows a usage example, do not imply that an unrelated sample image came from that example
+- If a sample only validates the default prompt, say that explicitly
+- Keep model names exact (`gemini-3-pro-image-preview`, not just "Pro") so agents can reason over support reliably
 
 ## .source.json (Install Provenance)
 

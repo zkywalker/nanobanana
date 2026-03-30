@@ -178,6 +178,13 @@ Run `/nanobanana create-template` for a guided 4-phase wizard: intent gathering 
 
 Template format: `{{variable|default value}}` slots in the prompt, with a variables table and tips section. Full spec in `references/template-format-spec.md`.
 
+Publishing checklist:
+
+- Name each sample with the generating model shorthand, for example `sample-3-pro-01.png`
+- Keep `template.md` sample metadata exact: `file`, `model`, `prompt`, `aspect`
+- Add `README.md` sections for `Verified Models`, `Supported Models`, and `Sample Outputs`
+- In `Sample Outputs`, map every sample file to the model and exact prompt or variant it validates
+
 ## How Prompt Optimization Works
 
 ```
