@@ -3,7 +3,7 @@ id: cute-sticker
 type: prompt
 title: Q版贴纸表情包
 title_en: Cute Chibi Sticker Pack
-author: nanobanana
+author: bananahub
 version: 1.0.0
 profile: sticker
 tags: [贴纸, 表情包, Q版, 可爱, chibi]
@@ -51,17 +51,17 @@ A cute chibi sticker of {{subject|a round fluffy cat}}, {{expression|happy and e
 
 **Basic**:
 ```
-/nanobanana use cute-sticker
+/bananahub use cute-sticker
 ```
 
 **Custom character**:
 ```
-/nanobanana use cute-sticker 一只柴犬，露出嫌弃的表情
+/bananahub use cute-sticker 一只柴犬，露出嫌弃的表情
 ```
 
 **Custom emotion**:
 ```
-/nanobanana use cute-sticker 小恐龙，哭泣委屈的样子，抱着一个枕头
+/bananahub use cute-sticker 小恐龙，哭泣委屈的样子，抱着一个枕头
 ```
 
 ## Tips

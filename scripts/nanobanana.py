@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Nano Banana - Gemini image generation CLI tool."""
+"""BananaHub - Gemini image generation CLI tool."""
 
 import argparse
 import json
@@ -25,7 +25,8 @@ def load_dotenv(env_path):
     return config
 
 
-SKILL_CONFIG_PATH = Path.home() / ".config" / "nanobanana" / "config.json"
+SKILL_CONFIG_PATH = Path.home() / ".config" / "bananahub" / "config.json"
+LEGACY_SKILL_CONFIG_PATH = Path.home() / ".config" / "nanobanana" / "config.json"
 LEGACY_ENV_PATH = Path.home() / ".gemini" / ".env"
 
 # Mapping from config.json keys to internal config keys
@@ -39,15 +40,26 @@ def load_config(config_file=None):
     """Load API config with priority chain:
     1. Explicit --config file (JSON or .env)
     2. Environment variables
-    3. Skill config: ~/.config/nanobanana/config.json
-    4. Legacy .env:  ~/.gemini/.env
+    3. Skill config: ~/.config/bananahub/config.json
+    4. Legacy skill config: ~/.config/nanobanana/config.json
+    5. Legacy .env:  ~/.gemini/.env
     """
     config = {}
 
-    # Layer 4 (lowest): legacy ~/.gemini/.env
+    # Layer 5 (lowest): legacy ~/.gemini/.env
     config.update(load_dotenv(LEGACY_ENV_PATH))
 
-    # Layer 3: skill config ~/.config/nanobanana/config.json
+    # Layer 4: legacy skill config ~/.config/nanobanana/config.json
+    if LEGACY_SKILL_CONFIG_PATH.exists():
+        try:
+            data = json.loads(LEGACY_SKILL_CONFIG_PATH.read_text())
+            for json_key, env_key in CONFIG_KEY_MAP.items():
+                if json_key in data and data[json_key]:
+                    config[env_key] = data[json_key]
+        except (json.JSONDecodeError, KeyError):
+            pass
+
+    # Layer 3: preferred skill config ~/.config/bananahub/config.json
     if SKILL_CONFIG_PATH.exists():
         try:
             data = json.loads(SKILL_CONFIG_PATH.read_text())
@@ -86,6 +98,7 @@ def load_config(config_file=None):
             f"  --config <file>",
             f"  env GEMINI_API_KEY",
             f"  {SKILL_CONFIG_PATH}",
+            f"  {LEGACY_SKILL_CONFIG_PATH}",
             f"  {LEGACY_ENV_PATH}",
         ]
         print(json.dumps({
@@ -126,6 +139,8 @@ def cmd_init(args):
         config_sources.append("env")
     if SKILL_CONFIG_PATH.exists():
         config_sources.append(str(SKILL_CONFIG_PATH))
+    if LEGACY_SKILL_CONFIG_PATH.exists():
+        config_sources.append(str(LEGACY_SKILL_CONFIG_PATH))
     if LEGACY_ENV_PATH.exists():
         config_sources.append(str(LEGACY_ENV_PATH))
 
@@ -140,7 +155,16 @@ def cmd_init(args):
     try:
         # Layer 4: legacy .env
         config.update(load_dotenv(LEGACY_ENV_PATH))
-        # Layer 3: skill config
+        # Layer 4: legacy skill config
+        if LEGACY_SKILL_CONFIG_PATH.exists():
+            try:
+                data = json.loads(LEGACY_SKILL_CONFIG_PATH.read_text())
+                for json_key, env_key in CONFIG_KEY_MAP.items():
+                    if json_key in data and data[json_key]:
+                        config[env_key] = data[json_key]
+            except (json.JSONDecodeError, KeyError):
+                pass
+        # Layer 3: preferred skill config
         if SKILL_CONFIG_PATH.exists():
             try:
                 data = json.loads(SKILL_CONFIG_PATH.read_text())
@@ -212,17 +236,21 @@ def cmd_init(args):
                 f"  1. mkdir -p {SKILL_CONFIG_PATH.parent}",
                 f'  2. Create {SKILL_CONFIG_PATH} with:',
                 '     {"api_key": "your_api_key_here", "base_url": "https://..."}',
-                "Option B: Create legacy .env:",
+                "Option B: Reuse legacy skill config path:",
+                f"  1. mkdir -p {LEGACY_SKILL_CONFIG_PATH.parent}",
+                f'  2. Create {LEGACY_SKILL_CONFIG_PATH} with:',
+                '     {"api_key": "your_api_key_here", "base_url": "https://..."}',
+                "Option C: Create legacy .env:",
                 f"  1. mkdir -p {LEGACY_ENV_PATH.parent}",
                 f"  2. Create {LEGACY_ENV_PATH} with:",
                 "     GEMINI_API_KEY=your_api_key_here",
                 "     GOOGLE_GEMINI_BASE_URL=https://...  (optional)",
-                "Option C: Set environment variables:",
+                "Option D: Set environment variables:",
                 "  export GEMINI_API_KEY=your_api_key_here",
                 "",
                 "Get your API key from: https://aistudio.google.com/apikey",
                 "Install dependencies: pip install google-genai pillow",
-                f"Run again: python3 nanobanana.py init",
+                f"Run again: python3 bananahub.py init",
             ]
         }
 
@@ -592,7 +620,7 @@ def cmd_edit(args):
                     output_dir = Path.cwd()
                     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                     model_short = model.replace("gemini-", "").replace("-preview", "").replace("-image-generation", "")
-                    output_path = output_dir / f"nanobanana_edit_{model_short}_{timestamp}.png"
+                    output_path = output_dir / f"bananahub_edit_{model_short}_{timestamp}.png"
 
                 output_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -777,7 +805,7 @@ def cmd_generate(args):
                     output_dir = Path.cwd()
                     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                     model_short = model.replace("gemini-", "").replace("-preview", "").replace("-image-generation", "")
-                    output_path = output_dir / f"nanobanana_{model_short}_{timestamp}.png"
+                    output_path = output_dir / f"bananahub_{model_short}_{timestamp}.png"
 
                 output_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -867,7 +895,7 @@ def cmd_generate(args):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Nano Banana - Gemini image generation")
+    parser = argparse.ArgumentParser(prog="bananahub.py", description="BananaHub - Gemini image generation")
     parser.add_argument("--config", help="Path to config file (JSON or .env)")
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 

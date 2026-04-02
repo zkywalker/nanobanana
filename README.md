@@ -1,12 +1,12 @@
-# Nano Banana 🍌
+# BananaHub Skill 🍌
 
 [简体中文说明](./README.zh-CN.md)
 
-A [Claude Code Skill](https://docs.anthropic.com/en/docs/claude-code/skills) that turns Chinese image descriptions into optimized English prompts and generates images via the Gemini API.
+A [Claude Code Skill](https://docs.anthropic.com/en/docs/claude-code/skills) that turns Chinese image descriptions into optimized English prompts and generates or edits images via the Gemini API.
 
 ## Product Summary
 
-Nano Banana is not just a prompt optimizer. It is an agent-native image workflow for Gemini inside Claude Code:
+BananaHub is not just a prompt optimizer. It is an agent-native Gemini image workflow inside Claude Code:
 
 - **Agent-native runtime** — optimization, generation, editing, template use, and iteration happen in the same conversation
 - **Progressive disclosure guidance** — the skill stays quiet on low-risk cleanup, asks only when ambiguity would materially change the result, and suggests templates only when there is a strong match
@@ -33,17 +33,23 @@ Nano Banana is not just a prompt optimizer. It is an agent-native image workflow
 ## Installation
 
 ```bash
-claude skill install /path/to/nanobanana
+claude skill install /path/to/banana-hub-skill
 # or from GitHub
-claude skill install https://github.com/nano-banana-hub/nanobanana
+claude skill install https://github.com/bananahub-ai/banana-hub-skill
 ```
+
+Primary command: `/bananahub`
+
+Compatibility notes:
+- Legacy config in `~/.config/nanobanana/` still works as a fallback.
+- `scripts/nanobanana.py` remains available as a legacy entrypoint, but `scripts/bananahub.py` is now the primary path.
 
 ## Setup
 
 After installation, run the init command to configure your environment:
 
 ```
-/nanobanana init
+/bananahub init
 ```
 
 This will:
@@ -56,22 +62,22 @@ This will:
 ## Usage
 
 ```
-/nanobanana 一只橘猫趴在键盘上打盹
+/bananahub 一只橘猫趴在键盘上打盹
 ```
 
 ### Commands
 
 | Command | Description |
 |---|---|
-| `/nanobanana <中文描述>` | Optimize prompt + generate image |
-| `/nanobanana edit <描述> --input <图片>` | Edit an existing image with a text prompt |
-| `/nanobanana optimize <描述>` | Optimize prompt only (no generation) |
-| `/nanobanana generate <English prompt>` | Generate with an English prompt directly |
-| `/nanobanana models` | List available models |
-| `/nanobanana discover <need>` | Search BananaHub for matching templates and suggest install candidates |
-| `/nanobanana discover trending` | Show current trending BananaHub templates |
-| `/nanobanana init` | Check/setup environment |
-| `/nanobanana help` | Show usage instructions |
+| `/bananahub <中文描述>` | Optimize prompt + generate image |
+| `/bananahub edit <描述> --input <图片>` | Edit an existing image with a text prompt |
+| `/bananahub optimize <描述>` | Optimize prompt only (no generation) |
+| `/bananahub generate <English prompt>` | Generate with an English prompt directly |
+| `/bananahub models` | List available models |
+| `/bananahub discover <need>` | Search BananaHub for matching templates and suggest install candidates |
+| `/bananahub discover trending` | Show current trending BananaHub templates |
+| `/bananahub init` | Check/setup environment |
+| `/bananahub help` | Show usage instructions |
 
 ### Flags
 
@@ -91,34 +97,34 @@ This will:
 
 ```bash
 # Basic usage — interactive optimization
-/nanobanana 赛博朋克风格的东京街头夜景
+/bananahub 赛博朋克风格的东京街头夜景
 
 # Direct mode — no confirmations
-/nanobanana 水彩风格的猫咪 --direct
+/bananahub 水彩风格的猫咪 --direct
 
 # Raw mode — translate only, no optimization
-/nanobanana 一个简单的红色圆圈 --raw
+/bananahub 一个简单的红色圆圈 --raw
 
 # Specify aspect ratio, model, and native image size
-/nanobanana 山水画风格的桂林风景 --aspect 16:9 --model gemini-2.5-flash-image --image-size 2K
+/bananahub 山水画风格的桂林风景 --aspect 16:9 --model gemini-2.5-flash-image --image-size 2K
 
 # Sticker / emoji
-/nanobanana 画一个开心的柴犬表情包
+/bananahub 画一个开心的柴犬表情包
 
 # 3D render
-/nanobanana 等距视角的咖啡店室内设计
+/bananahub 等距视角的咖啡店室内设计
 
 # Product photography
-/nanobanana 白底蓝牙耳机产品图
+/bananahub 白底蓝牙耳机产品图
 
 # Concept art
-/nanobanana 赛博朋克风格的女性角色设计
+/bananahub 赛博朋克风格的女性角色设计
 
 # Edit an existing image
-/nanobanana edit 把背景换成海滩 --input photo.png
+/bananahub edit 把背景换成海滩 --input photo.png
 
 # Edit with native 2K output, then resize for delivery
-/nanobanana edit 添加一顶圣诞帽 --input avatar.png --image-size 2K --resize 1024x1024 --output avatar_xmas.png
+/bananahub edit 添加一顶圣诞帽 --input avatar.png --image-size 2K --resize 1024x1024 --output avatar_xmas.png
 ```
 
 ## Templates
@@ -129,36 +135,36 @@ Built-in templates are reusable agent modules. Some are `prompt` templates that 
 
 | Command | Description |
 |---|---|
-| `/nanobanana templates` | List all available templates |
-| `/nanobanana templates <name>` | Show template details based on its type |
-| `/nanobanana use <name>` | Activate a prompt template or start a workflow template |
-| `/nanobanana use <name> <描述>` | Activate with custom variable overrides or workflow context |
-| `/nanobanana discover <need>` | Search BananaHub and recommend remote templates |
-| `/nanobanana create-template` | AI-guided prompt/workflow template creation wizard |
+| `/bananahub templates` | List all available templates |
+| `/bananahub templates <name>` | Show template details based on its type |
+| `/bananahub use <name>` | Activate a prompt template or start a workflow template |
+| `/bananahub use <name> <描述>` | Activate with custom variable overrides or workflow context |
+| `/bananahub discover <need>` | Search BananaHub and recommend remote templates |
+| `/bananahub create-template` | AI-guided prompt/workflow template creation wizard |
 
 ### Examples
 
 ```bash
 # List all templates
-/nanobanana templates
+/bananahub templates
 
 # Preview a template
-/nanobanana templates cyberpunk-city
+/bananahub templates cyberpunk-city
 
 # Generate with prompt-template defaults
-/nanobanana use cyberpunk-city
+/bananahub use cyberpunk-city
 
 # Override prompt-template variables with a description
-/nanobanana use cyberpunk-city 东京新宿街头，紫色和金色霓虹
+/bananahub use cyberpunk-city 东京新宿街头，紫色和金色霓虹
 
 # Start a workflow template
-/nanobanana use consistent-character-storyboard
+/bananahub use consistent-character-storyboard
 
-# Ask Nano Banana to search BananaHub for a matching workflow
-/nanobanana discover logo 品牌标识
+# Ask the skill to search BananaHub for a matching workflow
+/bananahub discover logo 品牌标识
 
 # Use with flags
-/nanobanana use cyberpunk-city 上海外滩未来版 --aspect 9:16
+/bananahub use cyberpunk-city 上海外滩未来版 --aspect 9:16
 ```
 
 ### Workflow Spotlight
@@ -169,10 +175,10 @@ Typical flow:
 
 ```bash
 # Step 1: create or approve one master reference
-/nanobanana 一个可爱的暹罗猫IP，奶油色毛发，深棕色重点色，蓝眼睛，戴青绿色小围巾和金色铃铛
+/bananahub 一个可爱的暹罗猫IP，奶油色毛发，深棕色重点色，蓝眼睛，戴青绿色小围巾和金色铃铛
 
 # Step 2: start the workflow template
-/nanobanana use consistent-character-storyboard
+/bananahub use consistent-character-storyboard
 ```
 
 ### Built-in Templates
@@ -191,11 +197,11 @@ Typical flow:
 
 ### Installing More Templates (BananaHub)
 
-Use `/nanobanana discover <need>` when you want the skill to search BananaHub for you, rank a few candidates, and continue directly into installation and activation.
+Use `/bananahub discover <need>` when you want the skill to search BananaHub for you, rank a few candidates, and continue directly into installation and activation.
 
 ```bash
 # Ask the skill to search BananaHub
-/nanobanana discover repository explainer diagram
+/bananahub discover repository explainer diagram
 
 # Search the hub directly from the CLI
 npx bananahub search <keyword>
@@ -204,11 +210,11 @@ npx bananahub search <keyword>
 npx bananahub add <username>/<repo>
 ```
 
-User-installed templates are stored in `~/.config/nanobanana/templates/` and take precedence over built-ins on ID conflict.
+User-installed templates are stored in `~/.config/bananahub/templates/` and take precedence over built-ins on ID conflict.
 
 ### Creating Your Own Template
 
-Run `/nanobanana create-template` for a guided wizard: first choose `prompt` or `workflow`, then gather intent, draft the body, generate samples when useful, and assemble the final `template.md`.
+Run `/bananahub create-template` for a guided wizard: first choose `prompt` or `workflow`, then gather intent, draft the body, generate samples when useful, and assemble the final `template.md`.
 
 Prompt templates use `{{variable|default value}}` slots with a variables table and tips section. Workflow templates use sections such as `Goal`, `Inputs`, `Steps`, and `Prompt Blocks`. Full spec in `references/template-format-spec.md`.
 
@@ -243,19 +249,20 @@ User input (Chinese)
 
 | Model | Alias | Best For |
 |---|---|---|
-| `gemini-3-pro-image-preview` | Nano Banana Pro (default) | High quality, complex scenes, text rendering |
-| `gemini-3.1-flash-image-preview` | Nano Banana 2 | Better quality-speed balance, stronger iteration and text rendering than older Flash models |
-| `gemini-2.5-flash-image` | Nano Banana | Fast generation, rapid iteration |
+| `gemini-3-pro-image-preview` | Gemini 3 Pro Image (default) | High quality, complex scenes, text rendering |
+| `gemini-3.1-flash-image-preview` | Gemini 3.1 Flash Image | Better quality-speed balance, stronger iteration and text rendering than older Flash models |
+| `gemini-2.5-flash-image` | Gemini 2.5 Flash Image | Fast generation, rapid iteration |
 
 `gemini-2.0-flash-preview-image-generation` remains as a legacy fallback for older setups, but it is no longer the primary Flash recommendation.
 
 ## Project Structure
 
-```
-nanobanana/
+```text
+banana-hub-skill/
 ├── SKILL.md                          # Skill definition (Claude Code entry point)
 ├── scripts/
-│   └── nanobanana.py                 # Image generation CLI tool
+│   ├── bananahub.py                  # Primary image generation entrypoint
+│   └── nanobanana.py                 # Legacy compatibility entrypoint
 └── references/
     ├── prompt-guide.md               # Prompt optimization rules
     ├── official-sources.md           # Authoritative references & example library

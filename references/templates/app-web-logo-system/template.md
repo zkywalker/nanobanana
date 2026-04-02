@@ -4,7 +4,7 @@ type: workflow
 title: App/Web Logo 生成工作流
 title_en: App and Web Logo Workflow
 description: 先锁定品牌语义、平台约束和小尺寸识别，再生成 app 图标、favicon、字标和单色版。
-author: nanobanana
+author: bananahub
 version: 1.0.0
 profile: text-heavy
 tags: [logo, app图标, web logo, favicon, 品牌标识, icon, wordmark, maskable]

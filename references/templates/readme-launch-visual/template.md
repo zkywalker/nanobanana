@@ -4,7 +4,7 @@ type: workflow
 title: README 启动视觉工作流
 title_en: README Launch Visual Workflow
 description: 从 README、定位文案或功能清单里抽出一句主张和一张主视觉，生成适合首页头图、OG 封面或发布海报的图像。
-author: nanobanana
+author: bananahub
 version: 1.0.0
 profile: text-heavy
 tags: [README, 头图, 海报, 封面, OG, launch, hero, banner]
@@ -21,11 +21,11 @@ category: marketing
 samples:
   - file: samples/sample-3-pro-01.png
     model: gemini-3-pro-image-preview
-    prompt: "Create a launch visual for Nano Banana. Use the exact headline 'Agent-native image workflows' as the dominant text. Add the supporting line 'Prompt optimization, templates, and editing in one flow' in a smaller secondary position. The asset target is a homepage hero banner. Use a bold terminal-meets-product-doc composition with layered prompt cards flowing into generated image frames. Keep the design high-contrast, clean, and readable at a glance. Use a modern editorial product aesthetic with warm banana gold, ink black, and paper white. Do not invent extra UI labels or filler marketing copy."
+    prompt: "Create a launch visual for BananaHub. Use the exact headline 'Agent-native image workflows' as the dominant text. Add the supporting line 'Prompt optimization, templates, and editing in one flow' in a smaller secondary position. The asset target is a homepage hero banner. Use a bold terminal-meets-product-doc composition with layered prompt cards flowing into generated image frames. Keep the design high-contrast, clean, and readable at a glance. Use a modern editorial product aesthetic with warm banana gold, ink black, and paper white. Do not invent extra UI labels or filler marketing copy."
     aspect: "16:9"
   - file: samples/sample-3-pro-02.png
     model: gemini-3-pro-image-preview
-    prompt: "Create an OG cover image for Nano Banana. Keep the exact headline 'Build image workflows, not prompt piles'. Use minimal supporting text: 'Templates, editing, and iterative guidance for Gemini images'. Composition should be optimized for a wide social card, with clear breathing room around the text and one memorable visual metaphor based on modular prompt cards snapping into a guided workflow. Strong hierarchy, strong contrast, no clutter. Use a clean editorial product aesthetic with banana gold accents, black typography, and subtle paper texture."
+    prompt: "Create an OG cover image for BananaHub. Keep the exact headline 'Build image workflows, not prompt piles'. Use minimal supporting text: 'Templates, editing, and iterative guidance for Gemini images'. Composition should be optimized for a wide social card, with clear breathing room around the text and one memorable visual metaphor based on modular prompt cards snapping into a guided workflow. Strong hierarchy, strong contrast, no clutter. Use a clean editorial product aesthetic with banana gold accents, black typography, and subtle paper texture."
     aspect: "16:9"
 created: 2026-03-31
 updated: 2026-03-31

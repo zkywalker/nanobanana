@@ -64,7 +64,7 @@ After base optimization, check and fill in the following dimensions as needed (o
 
 ## Model Recommendation
 
-Product photography benefits from high detail — **prefer `gemini-3-pro-image-preview` (Nano Banana Pro)** for material fidelity and accurate text rendering on packaging.
+Product photography benefits from high detail — **prefer `gemini-3-pro-image-preview` (Gemini 3 Pro Image)** for material fidelity and accurate text rendering on packaging.
 
 ## Aspect Ratio
 

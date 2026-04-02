@@ -3,7 +3,7 @@ id: info-diagram
 type: prompt
 title: 信息图/流程图
 title_en: Infographic & Flowchart
-author: nanobanana
+author: bananahub
 version: 1.0.0
 profile: diagram
 tags: [信息图, 流程图, 图表, 知识卡片, 教程]
@@ -49,22 +49,22 @@ Create a clean infographic about {{topic|how coffee is made from bean to cup, in
 
 **Basic**:
 ```
-/nanobanana use info-diagram
+/bananahub use info-diagram
 ```
 
 **Custom topic**:
 ```
-/nanobanana use info-diagram Git 工作流程：从 commit 到 merge 的 4 个步骤
+/bananahub use info-diagram Git 工作流程：从 commit 到 merge 的 4 个步骤
 ```
 
 **Comparison layout**:
 ```
-/nanobanana use info-diagram React vs Vue 对比，左右两栏对比布局
+/bananahub use info-diagram React vs Vue 对比，左右两栏对比布局
 ```
 
 **Timeline**:
 ```
-/nanobanana use info-diagram AI 发展时间线，从 1950 到 2026，水平时间轴
+/bananahub use info-diagram AI 发展时间线，从 1950 到 2026，水平时间轴
 ```
 
 ## Tips

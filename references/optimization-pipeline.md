@@ -151,7 +151,7 @@ After profile matching, check if any installed template closely matches the user
 
 Use remote discovery only when at least one of these is true:
 
-- the user explicitly asks Nano Banana to find or recommend a template
+- the user explicitly asks BananaHub Skill to find or recommend a template
 - local matches are weak or missing
 - the task looks highly repeatable and likely has a reusable workflow on BananaHub
 

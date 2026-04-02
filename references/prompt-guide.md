@@ -1,4 +1,4 @@
-# Nano Banana Prompt Optimization Guide
+# BananaHub Prompt Optimization Guide
 
 This document defines the rules for the base optimization phase. For enhancement rules, see the Profile files in `profiles/`.
 
@@ -24,7 +24,7 @@ When optimizing a user prompt, check for and fix the following common issues:
 
 ### 5. Quality Tag Spam
 **Detect**: "masterpiece, best quality, ultra detailed, 8k, HDR", etc.
-**Fix**: delete. Nano Banana does not use quality tags. Describe the actual desired visual effect instead.
+**Fix**: delete. BananaHub prompt optimization does not use quality tags. Describe the actual desired visual effect instead.
 
 ### 6. In-Image Text Too Long
 **Detect**: requested render text exceeds 25 characters
@@ -44,7 +44,7 @@ Keep original-language text only for:
 Avoid unnecessary mixed-language prompts. Outside the preserved items above, descriptions, structure, and enhancement text should stay in English.
 
 ### Descriptive Text → Translate to English
-User's description of the scene content — translate into natural English (not literal; rewrite to suit Nano Banana's style).
+User's description of the scene content — translate into natural English (not literal; rewrite it to fit BananaHub's optimization style).
 
 ### In-Image Text → Preserve Original Language
 Text the user wants displayed in the image — preserve in original language, wrapped in quotes.
@@ -240,19 +240,19 @@ Write in **natural descriptive sentences**, not comma-separated tag lists. Gemin
 
 ## Model Reference
 
-### gemini-3-pro-image-preview (Nano Banana Pro)
+### gemini-3-pro-image-preview (Gemini 3 Pro Image)
 - **Best for**: high quality, rich detail, complex scenes, text rendering
 - **Aspect ratios**: 1:1, 16:9, 9:16, 4:3, 3:4, 3:2, 2:3
 - **Image sizes**: 1K, 2K, 4K
 - **Recommendation**: default model
 
-### gemini-3.1-flash-image-preview (Nano Banana 2)
+### gemini-3.1-flash-image-preview (Gemini 3.1 Flash Image)
 - **Best for**: strong quality-speed balance, more capable iterative generation, better text rendering than older Flash models
 - **Aspect ratios**: 1:1, 16:9, 9:16, 4:3, 3:4, 3:2, 2:3
 - **Image sizes**: 1K, 2K, 4K
 - **Trade-off**: usually faster than Pro while staying close on many everyday tasks
 
-### gemini-2.5-flash-image (Nano Banana)
+### gemini-2.5-flash-image (Gemini 2.5 Flash Image)
 - **Best for**: fast generation, simple scenes, rapid iteration
 - **Aspect ratios**: 1:1, 16:9, 9:16, 4:3, 3:4
 - **Image sizes**: 1K, 2K, 4K

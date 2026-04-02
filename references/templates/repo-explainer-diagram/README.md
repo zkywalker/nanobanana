@@ -1,11 +1,11 @@
 # Repository Explainer Diagram Workflow
 
-A Nanobanana workflow template for turning real repository context into one clean explainer visual. It is built for agent workflows where the model should read README sections, local notes, or codebase summaries first, then compress them into a diagram with short exact labels.
+A BananaHub workflow template for turning real repository context into one clean explainer visual. It is built for agent workflows where the model should read README sections, local notes, or codebase summaries first, then compress them into a diagram with short exact labels.
 
 ## Install
 
 ```bash
-npx bananahub add nano-banana-hub/nanobanana/repo-explainer-diagram
+npx bananahub add bananahub-ai/banana-hub-skill/repo-explainer-diagram
 ```
 
 ## Verified Models
@@ -21,5 +21,5 @@ npx bananahub add nano-banana-hub/nanobanana/repo-explainer-diagram
 
 | File | Model | Prompt / Variant |
 |---|---|---|
-| `samples/sample-3-pro-01.png` | `gemini-3-pro-image-preview` | `BananaHub Architecture` left-to-right diagram using five locked blocks: GitHub Templates, BananaHub CLI, Nanobanana Skill, Hub API, Catalog Site |
-| `samples/sample-3-pro-02.png` | `gemini-3-pro-image-preview` | `Nano Banana Template Flow` top-to-bottom workflow diagram using five locked blocks: User Request, Prompt Optimization, Profile Match, Template Suggestion, Generate or Edit |
+| `samples/sample-3-pro-01.png` | `gemini-3-pro-image-preview` | `BananaHub Architecture` left-to-right diagram using five locked blocks: GitHub Templates, BananaHub CLI, BananaHub Skill, Hub API, Catalog Site |
+| `samples/sample-3-pro-02.png` | `gemini-3-pro-image-preview` | `BananaHub Template Flow` top-to-bottom workflow diagram using five locked blocks: User Request, Prompt Optimization, Profile Match, Template Suggestion, Generate or Edit |

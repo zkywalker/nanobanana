@@ -4,7 +4,7 @@ When the user runs `init`, actively diagnose and fix issues — don't just repor
 
 ## Step 1: Run diagnostics
 
-Run `python3 ~/.claude/skills/nanobananaskill/scripts/nanobanana.py init --skip-test` first (skip API test until basics are ready). Parse the JSON output.
+Run `python3 ~/.claude/skills/bananahub/scripts/bananahub.py init --skip-test` first (skip API test until basics are ready). Parse the JSON output.
 
 ## Step 2: Fix missing dependencies automatically
 
@@ -20,7 +20,7 @@ If `config_source.ok` is false (no config found anywhere):
    - **Official Google API**: get a key from https://aistudio.google.com/apikey (free tier available)
    - **Proxy service**: if the user uses a proxy/relay (e.g., 88code), ask for their proxy key and base URL
 2. Ask if they need a custom base URL (for proxy users) or will use the default Google endpoint
-3. Once the user provides the key (and optionally base URL), create `~/.config/nanobanana/config.json`:
+3. Once the user provides the key (and optionally base URL), create `~/.config/bananahub/config.json`:
    ```json
    {"api_key": "<user's key>", "base_url": "<url if provided>"}
    ```
@@ -31,12 +31,12 @@ If `config_source.ok` is false (no config found anywhere):
 If config source exists but `api_key.ok` is false:
 - A config file exists but `GEMINI_API_KEY` / `api_key` is empty or missing
 - Ask the user for their key (same guidance as Step 3)
-- Write/update the key in `~/.config/nanobanana/config.json` (preferred) or the existing config file
+- Write/update the key in `~/.config/bananahub/config.json` (preferred) or the existing config file
 
 ## Step 5: Run full diagnostics with API test
 
 After dependencies and config are in place:
-- Run `python3 ~/.claude/skills/nanobananaskill/scripts/nanobanana.py init` (without --skip-test)
+- Run `python3 ~/.claude/skills/bananahub/scripts/bananahub.py init` (without --skip-test)
 - If API test passes → report success, environment is ready
 - If API test fails:
   - **Auth error (401/403)**: API key is invalid — ask user to double-check and provide a new one
@@ -53,7 +53,7 @@ Show a clear summary:
 ✅ 端点: https://... ✓
 ✅ 连通性: API 响应正常 ✓
 
-🎉 环境已就绪，可以开始生图！试试: /nanobanana 一只猫趴在键盘上
+🎉 环境已就绪，可以开始生图！试试: /bananahub 一只猫趴在键盘上
 ```
 
 Or if issues remain:

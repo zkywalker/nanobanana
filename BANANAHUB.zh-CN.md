@@ -11,14 +11,14 @@
 
 ## 产品定位
 
-BananaHub 是 Nano Banana 产品矩阵里的分发层。完整产品目前可以拆成四部分：
+BananaHub 是这套产品的统一品牌。落到实现上，目前可以拆成四层：
 
-- **Skill runtime**：agent-native 的 `/nanobanana` 交互入口，负责优化、生成、编辑和迭代
+- **BananaHub Skill runtime**：agent-native 的 `/bananahub` 交互入口，负责优化、生成、编辑和迭代
 - **Optimization engine**：负责约束提取、保守增强、渐进式澄清和按 profile 引导
 - **Template system**：把可复用的 prompt 或 workflow 能力沉淀成带元数据、样例和自动匹配能力的模块
 - **BananaHub distribution loop**：负责可搜索的画廊、安装 CLI、机器可读目录和安装 / 热度数据
 
-所以 BananaHub 不是一个巨大的 prompt 文本堆，而是让可复用 prompt 结构以“可安装模块”的方式流通，同时避免基础 skill 膨胀成一个大而全的单体。
+所以 BananaHub 不是一个巨大的 prompt 文本堆，而是让可复用 prompt 结构以“可安装模块”的方式流通，同时避免运行时膨胀成一个大而全的单体。
 
 ---
 
@@ -29,8 +29,8 @@ BananaHub 是 Nano Banana 产品矩阵里的分发层。完整产品目前可以
 │                    BananaHub 生态                         │
 │                                                          │
 │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌─────────┐ │
-│  │ Template │  │ CLI Tool │  │ Creator  │  │  Hub    │ │
-│  │  Format  │  │(bananahub│  │  Skill   │  │  Site   │ │
+│  │ Template │  │ CLI Tool │  │  Skill   │  │  Hub    │ │
+│  │  Format  │  │(bananahub│  │ Runtime  │  │  Site   │ │
 │  │          │  │   CLI)   │  │          │  │         │ │
 │  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬────┘ │
 │       │              │             │              │      │
@@ -54,7 +54,7 @@ BananaHub 是 Nano Banana 产品矩阵里的分发层。完整产品目前可以
 
 ## CLI 工具：`bananahub`
 
-**包名**：npm 上的 `bananahub` | **语言**：Node.js（ESM） | **源码**：`/home/coder/project/bananahub/`
+**包名**：npm 上的 `bananahub` | **语言**：Node.js（ESM） | **源码**：`/home/coder/project/nano-banana-hub/bananahub/`
 
 ### 命令
 
@@ -86,7 +86,7 @@ npx bananahub registry rebuild                   # 重建本地 .registry.json
 2. **识别类型**：根目录有 `template.md` 则为单模板；有 `bananahub.json` 则为多模板
 3. **下载内容**：通过 GitHub tarball API 下载并解压到临时目录
 4. **校验模板**：解析 frontmatter、检查必填字段、验证 samples
-5. **安装文件**：复制到 `~/.config/nanobanana/templates/<id>/`
+5. **安装文件**：复制到 `~/.config/bananahub/templates/<id>/`
 6. **写 `.source.json`**：记录来源信息
 7. **重建 registry**：重新生成 `.registry.json`
 8. **上报安装**：向 Hub API 发送安装事件（fire-and-forget）
@@ -159,9 +159,9 @@ BananaHub 的站点同时服务三类对象：
 ```json
 {
   "repos": [
-    "user-a/nanobanana-cyberpunk",
-    "user-b/nanobanana-templates",
-    "nanobanana/official-templates"
+    "user-a/bananahub-cyberpunk",
+    "user-b/bananahub-templates",
+    "bananahub-ai/banana-hub-skill"
   ]
 }
 ```
@@ -178,13 +178,13 @@ BananaHub 的站点同时服务三类对象：
       "title_en": "Cyberpunk City Nightscape",
       "description": "一键生成赛博朋克风格的城市夜景",
       "author": "user-a",
-      "repo": "user-a/nanobanana-cyberpunk",
+      "repo": "user-a/bananahub-cyberpunk",
       "profile": "photo",
       "tags": ["赛博朋克", "城市", "夜景"],
       "difficulty": "beginner",
       "models": [{ "name": "gemini-3-pro-image-preview", "quality": "best" }],
       "samples": [{
-        "url": "https://raw.githubusercontent.com/user-a/nanobanana-cyberpunk/main/samples/sample-01.jpg",
+        "url": "https://raw.githubusercontent.com/user-a/bananahub-cyberpunk/main/samples/sample-01.jpg",
         "model": "gemini-3-pro-image-preview",
         "prompt": "Cyberpunk city street at night..."
       }],
@@ -284,7 +284,7 @@ BananaHub 的站点同时服务三类对象：
 
 | 仓库 | 用途 | 状态 |
 |---|---|---|
-| `bananahub`（npm） | CLI 工具 | ✅ 已构建，路径：`/home/coder/project/bananahub/` |
-| `bananahub.github.io` | Hub 静态站点 | 规划中 |
-| `bananahub-api` | 安装统计的 Cloudflare Worker | 规划中 |
-| `nanobanana-official-templates` | 官方模板集合 | 规划中 |
+| `bananahub`（npm） | CLI 工具 | ✅ 已构建，路径：`/home/coder/project/nano-banana-hub/bananahub/` |
+| `bananahub-ai.github.io` | Hub 静态站点 | ✅ 已上线 |
+| `bananahub-api` | 安装统计的 Cloudflare Worker | ✅ 已上线 |
+| `banana-hub-skill` | 官方 skill 与内置模板集合 | ✅ 已上线 |

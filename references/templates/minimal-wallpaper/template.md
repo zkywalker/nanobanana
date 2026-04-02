@@ -3,7 +3,7 @@ id: minimal-wallpaper
 type: prompt
 title: 极简手机壁纸
 title_en: Minimal Phone Wallpaper
-author: nanobanana
+author: bananahub
 version: 1.0.0
 profile: minimal
 tags: [极简, 壁纸, 手机, 留白, 简约]
@@ -51,22 +51,22 @@ A minimalist phone wallpaper featuring {{subject|a single small paper boat}} {{p
 
 **Basic**:
 ```
-/nanobanana use minimal-wallpaper
+/bananahub use minimal-wallpaper
 ```
 
 **Custom subject**:
 ```
-/nanobanana use minimal-wallpaper 一棵孤独的树，秋天，橙色和米白配色
+/bananahub use minimal-wallpaper 一棵孤独的树，秋天，橙色和米白配色
 ```
 
 **Gradient style**:
 ```
-/nanobanana use minimal-wallpaper 日落渐变色，从深紫到淡橙，一只飞鸟剪影
+/bananahub use minimal-wallpaper 日落渐变色，从深紫到淡橙，一只飞鸟剪影
 ```
 
 **Abstract**:
 ```
-/nanobanana use minimal-wallpaper 几何线条，金色细线在深蓝背景上
+/bananahub use minimal-wallpaper 几何线条，金色细线在深蓝背景上
 ```
 
 ## Tips

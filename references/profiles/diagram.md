@@ -93,7 +93,7 @@ For diagrams with many labels, use this approach for better text accuracy:
 
 ## Model Recommendation
 
-- **Technical diagrams with many labels** → prefer Nano Banana Pro for text rendering accuracy
+- **Technical diagrams with many labels** → prefer Gemini 3 Pro Image for text rendering accuracy
 - **Diagrams requiring factual/real-world data** → mention that Gemini can leverage its knowledge base for known patterns (e.g., "standard microservices with API gateway pattern")
 
 ## Behavioral Notes

@@ -1,11 +1,11 @@
 # Local Asset Style Consistency Workflow
 
-A Nanobanana workflow template for building a consistent asset pack from local images. It is meant for agent runs where one approved anchor style should be propagated across additional images without changing locked composition, text, or subject identity.
+A BananaHub workflow template for building a consistent asset pack from local images. It is meant for agent runs where one approved anchor style should be propagated across additional images without changing locked composition, text, or subject identity.
 
 ## Install
 
 ```bash
-npx bananahub add nano-banana-hub/nanobanana/asset-style-consistency-pack
+npx bananahub add bananahub-ai/banana-hub-skill/asset-style-consistency-pack
 ```
 
 ## Verified Models

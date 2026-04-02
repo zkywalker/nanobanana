@@ -4,7 +4,7 @@ type: workflow
 title: 代码库讲解图工作流
 title_en: Repository Explainer Diagram Workflow
 description: 先读取 README、目录结构或代码摘要，再把代码库讲成一张结构清晰的信息图或架构讲解图。
-author: nanobanana
+author: bananahub
 version: 1.0.0
 profile: diagram
 tags: [代码库, 项目结构, 架构图, README, repo, codebase, architecture, explainer]
@@ -21,11 +21,11 @@ category: docs
 samples:
   - file: samples/sample-3-pro-01.png
     model: gemini-3-pro-image-preview
-    prompt: "Create a clean explainer diagram for BananaHub. Title: 'BananaHub Architecture'. Use a left-to-right architecture layout. Include these exact labeled blocks: 'Nanobanana Skill', 'BananaHub CLI', 'Hub API', 'Catalog Site', 'GitHub Templates'. Show only these verified relationships: the skill loads built-in and installed templates, the CLI installs templates from GitHub, the Hub API reports discovered installs, and the catalog site indexes curated and discovered templates. Keep labels short, high-contrast, and easy to read. Use a modern flat product-doc aesthetic with restrained blue, teal, and warm gray accents. Prioritize clarity over decoration."
+    prompt: "Create a clean explainer diagram for BananaHub. Title: 'BananaHub Architecture'. Use a left-to-right architecture layout. Include these exact labeled blocks: 'BananaHub Skill', 'BananaHub CLI', 'Hub API', 'Catalog Site', 'GitHub Templates'. Show only these verified relationships: the skill loads built-in and installed templates, the CLI installs templates from GitHub, the Hub API reports discovered installs, and the catalog site indexes curated and discovered templates. Keep labels short, high-contrast, and easy to read. Use a modern flat product-doc aesthetic with restrained blue, teal, and warm gray accents. Prioritize clarity over decoration."
     aspect: "4:3"
   - file: samples/sample-3-pro-02.png
     model: gemini-3-pro-image-preview
-    prompt: "Create a clean repository explainer diagram for Nano Banana. Title: 'Nano Banana Template Flow'. Use a top-to-bottom workflow layout. Include these exact labeled blocks: 'User Request', 'Prompt Optimization', 'Profile Match', 'Template Suggestion', 'Generate or Edit'. Show only these verified relationships: the user request goes into prompt optimization, optimization leads to profile matching, profile matching can trigger template suggestion, and the final step is generate or edit. Keep labels short, high-contrast, and easy to read. Use a crisp flat explainer-card aesthetic with soft grid background, restrained teal and banana-gold accents, and simple directional connectors."
+    prompt: "Create a clean repository explainer diagram for BananaHub. Title: 'BananaHub Template Flow'. Use a top-to-bottom workflow layout. Include these exact labeled blocks: 'User Request', 'Prompt Optimization', 'Profile Match', 'Template Suggestion', 'Generate or Edit'. Show only these verified relationships: the user request goes into prompt optimization, optimization leads to profile matching, profile matching can trigger template suggestion, and the final step is generate or edit. Keep labels short, high-contrast, and easy to read. Use a crisp flat explainer-card aesthetic with soft grid background, restrained teal and banana-gold accents, and simple directional connectors."
     aspect: "4:3"
 created: 2026-03-31
 updated: 2026-03-31

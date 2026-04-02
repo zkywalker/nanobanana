@@ -3,7 +3,7 @@ id: cyberpunk-city
 type: prompt
 title: 赛博朋克城市夜景
 title_en: Cyberpunk City Nightscape
-author: nanobanana
+author: bananahub
 version: 1.0.0
 profile: photo
 tags: [赛博朋克, 城市, 夜景, 科幻, neon]
@@ -51,18 +51,18 @@ A photorealistic wide-angle shot of a cyberpunk city street at night. {{scene_de
 
 **Basic** (use all defaults):
 ```
-/nanobanana use cyberpunk-city
+/bananahub use cyberpunk-city
 ```
 
 **Custom scene**:
 ```
-/nanobanana use cyberpunk-city 东京新宿街头，紫色和金色霓虹
+/bananahub use cyberpunk-city 东京新宿街头，紫色和金色霓虹
 ```
 The user description replaces relevant variables while keeping the template structure.
 
 **With flags**:
 ```
-/nanobanana use cyberpunk-city 上海外滩未来版 --model gemini-2.5-flash-image --aspect 9:16
+/bananahub use cyberpunk-city 上海外滩未来版 --model gemini-2.5-flash-image --aspect 9:16
 ```
 
 ## Tips

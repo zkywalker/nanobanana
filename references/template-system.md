@@ -1,6 +1,6 @@
 # Template System
 
-Nanobanana templates are reusable agent modules. They are not limited to single prompts. A template can be either:
+BananaHub Skill templates are reusable agent modules. They are not limited to single prompts. A template can be either:
 
 - `type: prompt` — a reusable prompt recipe with variables
 - `type: workflow` — a progressive-disclosure playbook that guides the agent through multiple steps
@@ -11,8 +11,8 @@ Templates support progressive disclosure: they can be auto-suggested when contex
 
 Templates are loaded from two locations (merged). On ID conflict, user-installed wins:
 
-1. **Built-in** (shipped with skill): `~/.claude/skills/nanobananaskill/references/templates/`
-2. **User-installed** (via `npx bananahub add`): `~/.config/nanobanana/templates/`
+1. **Built-in** (shipped with skill): `~/.claude/skills/bananahub/references/templates/`
+2. **User-installed** (via `npx bananahub add`): `~/.config/bananahub/templates/`
 
 Each path contains template directories and an auto-generated `.registry.json` index.
 
@@ -47,7 +47,7 @@ Required fields for listing and auto-matching:
 | `type` | Template kind: `prompt` or `workflow` | `workflow` |
 | `title` | Chinese display title for listing | `角色一致性分镜工作流` |
 | `title_en` | English display title | `Consistent Character Storyboard Workflow` |
-| `author` | GitHub username | `nanobanana` |
+| `author` | GitHub username | `bananahub-ai` |
 | `version` | Semver | `1.0.0` |
 | `profile` | Target enhancement profile or grouping bucket | `photo` |
 | `tags` | Bilingual keywords for search + auto-matching | `[分镜, storyboard, consistency]` |
@@ -130,10 +130,10 @@ Photo (photo)
 General workflows (general)
   consistent-character-storyboard [workflow]  ⭐⭐ intermediate
 
-Usage: /nanobanana templates <name>              Show details
-       /nanobanana use <name> [custom description]  Activate template
-       /nanobanana create-template               Create a new template
-Find more: /nanobanana discover <request>
+Usage: /bananahub templates <name>              Show details
+       /bananahub use <name> [custom description]  Activate template
+       /bananahub create-template               Create a new template
+Find more: /bananahub discover <request>
 ```
 
 ## `discover <request>` — Search BananaHub
@@ -154,7 +154,7 @@ Find more: /nanobanana discover <request>
 4. If `type: prompt`, show the prompt template, variables table, and tips
 5. If `type: workflow`, show the goal, inputs, steps, prompt blocks, and success checks
 6. If `samples` entries exist in frontmatter, show sample image paths
-7. End with usage hint: `/nanobanana use <name>`
+7. End with usage hint: `/bananahub use <name>`
 
 ## `use <template-id> [custom description]` — Activate Template
 

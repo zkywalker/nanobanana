@@ -11,14 +11,14 @@
 
 ## Positioning
 
-BananaHub is the distribution layer in the Nano Banana product matrix. The full product has four parts:
+BananaHub is the unified brand for this stack. In practice it has four tightly connected layers:
 
-- **Skill runtime** — the agent-native `/nanobanana` interface for optimization, generation, editing, and iteration
+- **BananaHub Skill runtime** — the agent-native `/bananahub` interface for optimization, generation, editing, and iteration
 - **Optimization engine** — constraint extraction, conservative enhancement, progressive clarification, and profile-specific guidance
 - **Template system** — reusable prompt or workflow modules with metadata, samples, and auto-matching
 - **BananaHub distribution loop** — searchable gallery, install CLI, machine-readable catalog, and install/trending telemetry
 
-BananaHub is therefore not a giant prompt dump. It is a way to let reusable prompt structures travel as installable modules, without turning the base skill into a monolith.
+BananaHub is therefore not a giant prompt dump. It is a way to let reusable prompt structures travel as installable modules, without turning the runtime into a monolith.
 
 ---
 
@@ -29,8 +29,8 @@ BananaHub is therefore not a giant prompt dump. It is a way to let reusable prom
 │                    BananaHub Ecosystem                    │
 │                                                          │
 │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌─────────┐ │
-│  │ Template  │  │ CLI Tool │  │ Creator  │  │  Hub    │ │
-│  │  Format   │  │(bananahub│  │  Skill   │  │  Site   │ │
+│  │ Template │  │ CLI Tool │  │  Skill   │  │  Hub    │ │
+│  │  Format  │  │(bananahub│  │ Runtime  │  │  Site   │ │
 │  │          │  │   CLI)   │  │          │  │         │ │
 │  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬────┘ │
 │       │              │             │              │      │
@@ -53,7 +53,7 @@ BananaHub is therefore not a giant prompt dump. It is a way to let reusable prom
 
 ## CLI Tool: `bananahub`
 
-**Package**: `bananahub` on npm | **Language**: Node.js (ESM) | **Source**: `/home/coder/project/bananahub/`
+**Package**: `bananahub` on npm | **Language**: Node.js (ESM) | **Source**: `/home/coder/project/nano-banana-hub/bananahub/`
 
 ### Commands
 
@@ -85,7 +85,7 @@ npx bananahub registry rebuild                    # Rebuild local .registry.json
 2. **Detect type**: root `template.md` (single) or `bananahub.json` (multi)
 3. **Download**: GitHub tarball API → extract to temp dir
 4. **Validate**: parse frontmatter, check required fields, validate samples
-5. **Install**: copy to `~/.config/nanobanana/templates/<id>/`
+5. **Install**: copy to `~/.config/bananahub/templates/<id>/`
 6. **Write .source.json**: record provenance
 7. **Rebuild registry**: regenerate `.registry.json`
 8. **Report install**: POST to hub API (fire-and-forget)
@@ -155,9 +155,9 @@ Static site (GitHub Pages)
 ```json
 {
   "repos": [
-    "user-a/nanobanana-cyberpunk",
-    "user-b/nanobanana-templates",
-    "nanobanana/official-templates"
+    "user-a/bananahub-cyberpunk",
+    "user-b/bananahub-templates",
+    "bananahub-ai/banana-hub-skill"
   ]
 }
 ```
@@ -174,13 +174,13 @@ Static site (GitHub Pages)
       "title_en": "Cyberpunk City Nightscape",
       "description": "一键生成赛博朋克风格的城市夜景",
       "author": "user-a",
-      "repo": "user-a/nanobanana-cyberpunk",
+      "repo": "user-a/bananahub-cyberpunk",
       "profile": "photo",
       "tags": ["赛博朋克", "城市", "夜景"],
       "difficulty": "beginner",
       "models": [{ "name": "gemini-3-pro-image-preview", "quality": "best" }],
       "samples": [{
-        "url": "https://raw.githubusercontent.com/user-a/nanobanana-cyberpunk/main/samples/sample-01.jpg",
+        "url": "https://raw.githubusercontent.com/user-a/bananahub-cyberpunk/main/samples/sample-01.jpg",
         "model": "gemini-3-pro-image-preview",
         "prompt": "Cyberpunk city street at night..."
       }],
@@ -275,10 +275,10 @@ Static site (GitHub Pages)
 
 | Repo | Purpose | Status |
 |------|---------|--------|
-| `bananahub` (npm) | CLI tool | ✅ Built at `/home/coder/project/bananahub/` |
-| `bananahub.github.io` | Hub static site | Planned |
-| `bananahub-api` | Cloudflare Worker for install tracking | Planned |
-| `nanobanana-official-templates` | Official template collection | Planned |
+| `bananahub` (npm) | CLI tool | ✅ Built at `/home/coder/project/nano-banana-hub/bananahub/` |
+| `bananahub-ai.github.io` | Hub static site | ✅ Live |
+| `bananahub-api` | Cloudflare Worker for install tracking | ✅ Live |
+| `banana-hub-skill` | Official skill + built-in template collection | ✅ Live |
 
 ## Open Questions
 

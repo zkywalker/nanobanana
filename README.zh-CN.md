@@ -1,12 +1,12 @@
-# Nano Banana 🍌
+# BananaHub Skill 🍌
 
 [English README](./README.md)
 
-Nano Banana 是一个 [Claude Code Skill](https://docs.anthropic.com/en/docs/claude-code/skills)。它会把中文图像需求整理成更适合模型理解的英文 prompt，再通过 Gemini API 生成或编辑图片。
+BananaHub Skill 是一个 [Claude Code Skill](https://docs.anthropic.com/en/docs/claude-code/skills)。它会把中文图像需求整理成更适合模型理解的英文 prompt，再通过 Gemini API 生成或编辑图片。
 
 ## 产品定位
 
-Nano Banana 不只是一个 prompt 优化器，它更像是 Claude Code 里的 Nano Banana 生图工作流：
+BananaHub 不只是一个 prompt 优化器，它更像是 Claude Code 里的 Gemini 生图工作流：
 
 - **Agent-native 交互**：优化、出图、编辑、套模板、继续迭代，都在同一段对话里完成
 - **渐进式披露引导**：低风险整理默认静默完成，只有在歧义会明显影响结果时才追问，命中高匹配模板时才提示切换
@@ -33,17 +33,23 @@ Nano Banana 不只是一个 prompt 优化器，它更像是 Claude Code 里的 N
 ## 安装
 
 ```bash
-claude skill install /path/to/nanobanana
+claude skill install /path/to/banana-hub-skill
 # 或直接从 GitHub 安装
-claude skill install https://github.com/nano-banana-hub/nanobanana
+claude skill install https://github.com/bananahub-ai/banana-hub-skill
 ```
+
+主命令：`/bananahub`
+
+兼容说明：
+- 旧的 `~/.config/nanobanana/` 配置目录仍然会作为 fallback 继续读取。
+- `scripts/nanobanana.py` 仍然保留为 legacy 入口，但主入口已经切到 `scripts/bananahub.py`。
 
 ## 初始化
 
 装好后先跑一次初始化，把环境配齐：
 
 ```bash
-/nanobanana init
+/bananahub init
 ```
 
 这个命令会做三件事：
@@ -57,22 +63,22 @@ claude skill install https://github.com/nano-banana-hub/nanobanana
 ## 基本用法
 
 ```bash
-/nanobanana 一只橘猫趴在键盘上打盹
+/bananahub 一只橘猫趴在键盘上打盹
 ```
 
 ### 命令
 
 | 命令 | 说明 |
 |---|---|
-| `/nanobanana <中文描述>` | 优化 prompt 并生成图片 |
-| `/nanobanana edit <描述> --input <图片>` | 按文字要求编辑现有图片 |
-| `/nanobanana optimize <描述>` | 只优化 prompt，不生成 |
-| `/nanobanana generate <English prompt>` | 直接用英文 prompt 生成 |
-| `/nanobanana models` | 列出可用模型 |
-| `/nanobanana discover <需求>` | 搜索 BananaHub 并推荐可安装模板 |
-| `/nanobanana discover trending` | 查看当前热门 BananaHub 模板 |
-| `/nanobanana init` | 检查并初始化环境 |
-| `/nanobanana help` | 查看帮助 |
+| `/bananahub <中文描述>` | 优化 prompt 并生成图片 |
+| `/bananahub edit <描述> --input <图片>` | 按文字要求编辑现有图片 |
+| `/bananahub optimize <描述>` | 只优化 prompt，不生成 |
+| `/bananahub generate <English prompt>` | 直接用英文 prompt 生成 |
+| `/bananahub models` | 列出可用模型 |
+| `/bananahub discover <需求>` | 搜索 BananaHub 并推荐可安装模板 |
+| `/bananahub discover trending` | 查看当前热门 BananaHub 模板 |
+| `/bananahub init` | 检查并初始化环境 |
+| `/bananahub help` | 查看帮助 |
 
 ### 参数
 
@@ -92,34 +98,34 @@ claude skill install https://github.com/nano-banana-hub/nanobanana
 
 ```bash
 # 常规用法：先优化，再确认
-/nanobanana 赛博朋克风格的东京街头夜景
+/bananahub 赛博朋克风格的东京街头夜景
 
 # 直出模式：不再逐项确认
-/nanobanana 水彩风格的猫咪 --direct
+/bananahub 水彩风格的猫咪 --direct
 
 # Raw 模式：只翻译，不做额外整理
-/nanobanana 一个简单的红色圆圈 --raw
+/bananahub 一个简单的红色圆圈 --raw
 
 # 指定宽高比、模型和原生出图尺寸
-/nanobanana 山水画风格的桂林风景 --aspect 16:9 --model gemini-2.5-flash-image --image-size 2K
+/bananahub 山水画风格的桂林风景 --aspect 16:9 --model gemini-2.5-flash-image --image-size 2K
 
 # 贴纸 / 表情包
-/nanobanana 画一个开心的柴犬表情包
+/bananahub 画一个开心的柴犬表情包
 
 # 3D 渲染
-/nanobanana 等距视角的咖啡店室内设计
+/bananahub 等距视角的咖啡店室内设计
 
 # 产品图
-/nanobanana 白底蓝牙耳机产品图
+/bananahub 白底蓝牙耳机产品图
 
 # 概念设计
-/nanobanana 赛博朋克风格的女性角色设计
+/bananahub 赛博朋克风格的女性角色设计
 
 # 编辑现有图片
-/nanobanana edit 把背景换成海滩 --input photo.png
+/bananahub edit 把背景换成海滩 --input photo.png
 
 # 先原生 2K 出图，再缩放到交付尺寸
-/nanobanana edit 添加一顶圣诞帽 --input avatar.png --image-size 2K --resize 1024x1024 --output avatar_xmas.png
+/bananahub edit 添加一顶圣诞帽 --input avatar.png --image-size 2K --resize 1024x1024 --output avatar_xmas.png
 ```
 
 ## 模板
@@ -130,36 +136,36 @@ claude skill install https://github.com/nano-banana-hub/nanobanana
 
 | 命令 | 说明 |
 |---|---|
-| `/nanobanana templates` | 列出全部模板 |
-| `/nanobanana templates <name>` | 按模板类型查看详情 |
-| `/nanobanana use <name>` | 激活 prompt 模板或启动 workflow 模板 |
-| `/nanobanana use <name> <描述>` | 带自定义变量或上下文激活模板 |
-| `/nanobanana discover <需求>` | 搜索 BananaHub 并推荐远程模板 |
-| `/nanobanana create-template` | 打开 AI 引导式 prompt/workflow 模板创建向导 |
+| `/bananahub templates` | 列出全部模板 |
+| `/bananahub templates <name>` | 按模板类型查看详情 |
+| `/bananahub use <name>` | 激活 prompt 模板或启动 workflow 模板 |
+| `/bananahub use <name> <描述>` | 带自定义变量或上下文激活模板 |
+| `/bananahub discover <需求>` | 搜索 BananaHub 并推荐远程模板 |
+| `/bananahub create-template` | 打开 AI 引导式 prompt/workflow 模板创建向导 |
 
 ### 模板示例
 
 ```bash
 # 列出全部模板
-/nanobanana templates
+/bananahub templates
 
 # 查看模板详情
-/nanobanana templates cyberpunk-city
+/bananahub templates cyberpunk-city
 
 # 直接用 prompt 模板默认值生成
-/nanobanana use cyberpunk-city
+/bananahub use cyberpunk-city
 
 # 用补充描述覆盖 prompt 模板变量
-/nanobanana use cyberpunk-city 东京新宿街头，紫色和金色霓虹
+/bananahub use cyberpunk-city 东京新宿街头，紫色和金色霓虹
 
 # 启动 workflow 模板
-/nanobanana use consistent-character-storyboard
+/bananahub use consistent-character-storyboard
 
-# 让 Nano Banana 去 BananaHub 找合适模板
-/nanobanana discover logo 品牌标识
+# 让 skill 去 BananaHub 找合适模板
+/bananahub discover logo 品牌标识
 
 # 配合参数使用
-/nanobanana use cyberpunk-city 上海外滩未来版 --aspect 9:16
+/bananahub use cyberpunk-city 上海外滩未来版 --aspect 9:16
 ```
 
 ### Workflow 样章
@@ -170,10 +176,10 @@ claude skill install https://github.com/nano-banana-hub/nanobanana
 
 ```bash
 # 第一步：先做或确认一张母图
-/nanobanana 一个可爱的暹罗猫IP，奶油色毛发，深棕色重点色，蓝眼睛，戴青绿色小围巾和金色铃铛
+/bananahub 一个可爱的暹罗猫IP，奶油色毛发，深棕色重点色，蓝眼睛，戴青绿色小围巾和金色铃铛
 
 # 第二步：启动 workflow 模板
-/nanobanana use consistent-character-storyboard
+/bananahub use consistent-character-storyboard
 ```
 
 ### 内置模板
@@ -192,11 +198,11 @@ claude skill install https://github.com/nano-banana-hub/nanobanana
 
 ### 安装更多模板（BananaHub）
 
-如果你想让 skill 自动去 BananaHub 搜索、排序并衔接安装与激活，优先直接用 `/nanobanana discover <需求>`。
+如果你想让 skill 自动去 BananaHub 搜索、排序并衔接安装与激活，优先直接用 `/bananahub discover <需求>`。
 
 ```bash
 # 让 skill 代你搜索 BananaHub
-/nanobanana discover 代码库讲解图
+/bananahub discover 代码库讲解图
 
 # 直接用 CLI 搜索 BananaHub
 npx bananahub search <关键词>
@@ -205,11 +211,11 @@ npx bananahub search <关键词>
 npx bananahub add <username>/<repo>
 ```
 
-用户安装的模板保存在 `~/.config/nanobanana/templates/`。如果和内置模板 ID 冲突，用户模板优先。
+用户安装的模板保存在 `~/.config/bananahub/templates/`。如果和内置模板 ID 冲突，用户模板优先。
 
 ### 自己创建模板
 
-运行 `/nanobanana create-template` 会进入一个引导式向导：先判断是 `prompt` 还是 `workflow` 模板，再整理内容草稿，必要时生成样例，最后组装成模板文件。最终产物是一个可直接发到 GitHub，或者提交到 BananaHub 的 `template.md`。
+运行 `/bananahub create-template` 会进入一个引导式向导：先判断是 `prompt` 还是 `workflow` 模板，再整理内容草稿，必要时生成样例，最后组装成模板文件。最终产物是一个可直接发到 GitHub，或者提交到 BananaHub 的 `template.md`。
 
 `prompt` 模板使用 `{{变量名|默认值}}` 占位符、变量表和 tips 区块；`workflow` 模板使用 `Goal`、`Inputs`、`Steps`、`Prompt Blocks` 这类多步结构。完整规范见 `references/template-format-spec.md`。
 
@@ -244,19 +250,20 @@ npx bananahub add <username>/<repo>
 
 | 模型 | 别名 | 适合场景 |
 |---|---|---|
-| `gemini-3-pro-image-preview` | Nano Banana Pro（默认） | 质量优先、复杂场景、文字渲染 |
-| `gemini-3.1-flash-image-preview` | Nano Banana 2 | 质量和速度更均衡，多轮迭代和文字渲染能力更强 |
-| `gemini-2.5-flash-image` | Nano Banana | 速度优先、快速试稿 |
+| `gemini-3-pro-image-preview` | Gemini 3 Pro Image（默认） | 质量优先、复杂场景、文字渲染 |
+| `gemini-3.1-flash-image-preview` | Gemini 3.1 Flash Image | 质量和速度更均衡，多轮迭代和文字渲染能力更强 |
+| `gemini-2.5-flash-image` | Gemini 2.5 Flash Image | 速度优先、快速试稿 |
 
 `gemini-2.0-flash-preview-image-generation` 仍保留为兼容旧环境的 legacy fallback，但不再是主要推荐的 Flash 模型。
 
 ## 项目结构
 
 ```text
-nanobanana/
+banana-hub-skill/
 ├── SKILL.md                          # Skill 定义（Claude Code 入口）
 ├── scripts/
-│   └── nanobanana.py                 # 图片生成 CLI 工具
+│   ├── bananahub.py                  # 主图片生成入口
+│   └── nanobanana.py                 # legacy 兼容入口
 └── references/
     ├── prompt-guide.md               # Prompt 优化规则
     ├── official-sources.md           # 权威参考和示例库

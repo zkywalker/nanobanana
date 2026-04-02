@@ -81,7 +81,7 @@ For designs with multiple text elements, use this two-step approach for signific
 
 ## Model Recommendation
 
-For text rendering scenarios, **automatically prefer `gemini-3-pro-image-preview` (Nano Banana Pro)** unless the user specifies a different model. The Pro model is significantly better than Flash at text clarity and typographic accuracy.
+For text rendering scenarios, **automatically prefer `gemini-3-pro-image-preview` (Gemini 3 Pro Image)** unless the user specifies a different model. The Pro model is significantly better than Flash at text clarity and typographic accuracy.
 
 ## Aspect Ratio
 

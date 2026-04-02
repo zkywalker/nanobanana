@@ -1,11 +1,11 @@
 # Consistent Character Storyboard Workflow
 
-A Nanobanana workflow template for role-consistent storyboard exploration. It helps the agent lock one master character image, branch into contact-sheet or storyboard exploration, and iterate with single-variable edits instead of rewriting everything from scratch each round.
+A BananaHub workflow template for role-consistent storyboard exploration. It helps the agent lock one master character image, branch into contact-sheet or storyboard exploration, and iterate with single-variable edits instead of rewriting everything from scratch each round.
 
 ## Install
 
 ```bash
-npx bananahub add your-username/consistent-character-storyboard
+npx bananahub add bananahub-ai/banana-hub-skill/consistent-character-storyboard
 ```
 
 ## Verified Models

@@ -1,11 +1,11 @@
 # App and Web Logo Workflow
 
-A Nanobanana workflow template for generating app and web logos with platform-aware constraints. It is optimized for concept development where the model should first produce an icon-first mark that survives small sizes, then derive website and store variants from the same core idea.
+A BananaHub workflow template for generating app and web logos with platform-aware constraints. It is optimized for concept development where the model should first produce an icon-first mark that survives small sizes, then derive website and store variants from the same core idea.
 
 ## Install
 
 ```bash
-npx bananahub add nano-banana-hub/nanobanana/app-web-logo-system
+npx bananahub add bananahub-ai/banana-hub-skill/app-web-logo-system
 ```
 
 ## Best Practices
@@ -17,7 +17,7 @@ npx bananahub add nano-banana-hub/nanobanana/app-web-logo-system
 - Treat text as an exact lock. Only request initials or a wordmark when the copy is final and short enough to verify.
 - Create variants on purpose: icon-only, wordmark, monochrome, and maskable or adaptive-icon versions should be separate passes.
 - Review at small sizes early. If the mark fails at 16 to 32 pixels, simplify geometry before exploring style.
-- Use Nano Banana as concept generation and controlled iteration, then finish the selected direction in vector tools.
+- Use BananaHub Skill for concept generation and controlled iteration, then finish the selected direction in vector tools.
 
 ## Platform Notes
 

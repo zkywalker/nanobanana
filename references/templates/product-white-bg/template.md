@@ -3,7 +3,7 @@ id: product-white-bg
 type: prompt
 title: 电商白底产品图
 title_en: E-commerce Product on White
-author: nanobanana
+author: bananahub
 version: 1.0.0
 profile: product
 tags: [产品图, 电商, 白底, 商品, 淘宝]
@@ -49,17 +49,17 @@ A photorealistic professional product photograph of {{product|a sleek wireless B
 
 **Basic**:
 ```
-/nanobanana use product-white-bg
+/bananahub use product-white-bg
 ```
 
 **Custom product**:
 ```
-/nanobanana use product-white-bg 一瓶绿色玻璃瓶的精酿啤酒，带水珠
+/bananahub use product-white-bg 一瓶绿色玻璃瓶的精酿啤酒，带水珠
 ```
 
 **Specific angle**:
 ```
-/nanobanana use product-white-bg 红色运动鞋，侧面视角，突出鞋底纹理
+/bananahub use product-white-bg 红色运动鞋，侧面视角，突出鞋底纹理
 ```
 
 ## Tips
