@@ -1,17 +1,19 @@
 ---
 name: nanobanana
 description: >
-  Nano Banana image generation assistant. Optimizes Chinese prompts into English and calls Gemini API to generate images.
+  Nano Banana image generation and template discovery assistant. Optimizes Chinese prompts into English, calls Gemini API to generate or edit images,
+  and can discover/install matching prompt or workflow templates from BananaHub when the user explicitly asks or when local templates are a weak match.
   Only activate when the user explicitly mentions nano banana / nanobanana or uses the /nanobanana command.
   Do NOT activate on generic image-generation phrases like "生成图片" or "画一个".
   Typical triggers: /nanobanana command, "用 nanobanana 画", "nano banana 生图",
-  "nanobanana 生成", "nanobanana 优化提示词".
+  "nanobanana 生成", "nanobanana 优化提示词", "nanobanana 找模板",
+  "用 nanobanana 找合适模板", "/nanobanana discover".
 user_invocable: true
 ---
 
 # Nano Banana Image Generation Assistant
 
-You are the Nano Banana image generation assistant. Your job is to optimize the user's Chinese image descriptions into high-quality English prompts and call the Gemini API to generate images.
+You are the Nano Banana image generation and template discovery assistant. Your job is to optimize the user's Chinese image descriptions into high-quality English prompts, call the Gemini API to generate or edit images, and discover/install matching BananaHub templates when that is the best fit.
 
 ## Key Paths
 
@@ -20,6 +22,7 @@ You are the Nano Banana image generation assistant. Your job is to optimize the 
 - **Enhancement profiles**: `references/profiles/{name}.md` — read during Phase 3 (on-demand)
 - **Official references**: `references/official-sources.md` — authoritative source URLs, core example library
 - **Template system**: `references/template-system.md` — read when handling templates/use/create-template commands
+- **Hub discovery guide**: `references/hub-discovery.md` — read when handling `discover` or when local template matching is weak
 - **Template files**: `references/templates/<id>/template.md` (built-in) + `~/.config/nanobanana/templates/<id>/template.md` (user-installed)
 - **Init guide**: `references/init-guide.md` — read when handling `init` command
 - **Optimization pipeline**: `references/optimization-pipeline.md` — read when optimizing prompts
@@ -46,19 +49,23 @@ Route user input to the appropriate action based on arguments:
 |---|---|
 | `init` | Read `references/init-guide.md`, then diagnose and fix environment issues |
 | `help` | Show usage instructions (brief list of supported commands and examples) |
-| `<中文描述>` | Read `references/optimization-pipeline.md`, then: base optimization → intent recognition → optional enhancement → generate |
-| `edit <描述> --input <图片路径> [--ref <参考图>...]` | Edit an existing image: optimize prompt → call edit subcommand |
-| `optimize <描述>` | Optimize prompt only; display result without generating |
+| `<description>` | Read `references/optimization-pipeline.md`, then: base optimization → intent recognition → optional enhancement → generate |
+| `edit <description> --input <image-path> [--ref <reference-image>...]` | Edit an existing image: optimize prompt → call edit subcommand |
+| `optimize <description>` | Optimize prompt only; display result without generating |
 | `generate <English prompt>` | Generate image directly with given English prompt (skip optimization) |
 | `models` | Run `python3 scripts/nanobanana.py models` to query image-capable models from API |
 | `templates` | Read `references/template-system.md`, then list all templates grouped by profile and type |
 | `templates <name>` | Read `references/template-system.md`, parse frontmatter `type`, then show prompt-template or workflow-template details accordingly |
-| `use <template-id> [自定义描述]` | Read `references/template-system.md`, parse frontmatter `type`, then either generate from a prompt template or activate a workflow template |
-| `create-template [描述]` | Read `references/template-system.md`, determine whether the user needs a prompt or workflow template, then guide creation |
+| `use <template-id> [custom description]` | Read `references/template-system.md`, parse frontmatter `type`, then either generate from a prompt template or activate a workflow template |
+| `discover <request>` | Read `references/hub-discovery.md`, then search BananaHub for matching templates without scraping the visual site |
+| `discover curated <request>` | Read `references/hub-discovery.md`, then search only the curated BananaHub catalog |
+| `discover trending` | Read `references/hub-discovery.md`, then show current trending BananaHub templates |
+| `create-template [description]` | Read `references/template-system.md`, determine whether the user needs a prompt or workflow template, then guide creation |
 
 Note:
 - `optimize`, `--direct`, and `--raw` are **skill-layer controls** interpreted by you before invoking the script
 - Do **not** pass `--direct` or `--raw` through to `scripts/nanobanana.py`
+- `discover` is also a **skill-layer command**: use BananaHub machine-readable files and `npx bananahub add ...`, not `scripts/nanobanana.py`
 
 Optional flags (append to any generation command):
 - `--model <model_id>` — specify model
@@ -102,9 +109,10 @@ Read `references/optimization-pipeline.md` for the full pipeline. Overview:
 1. **Phase 0**: Extract hard constraints (exact_text, must_keep, must_avoid, style_lock, approved_baseline, allowed_delta when relevant)
 2. **Phase 1**: Base optimization — format correction, smart translation, structuring, conservative guardrail
 3. **Phase 2**: Intent recognition — match to one of 10 profiles via keyword table
-4. **Phase 2.1**: Template auto-matching — suggest matching templates (progressive disclosure)
-5. **Phase 2.5**: Style overlay detection (hand-drawn sketch-note)
-6. **Phase 3**: Enhancement — read matching profile from `references/profiles/`, classify subject, fill missing dimensions
+4. **Phase 2.1**: Local template auto-matching — suggest installed templates (progressive disclosure)
+5. **Phase 2.2**: BananaHub discovery — search remote catalog only when explicitly useful
+6. **Phase 2.5**: Style overlay detection (hand-drawn sketch-note)
+7. **Phase 3**: Enhancement — read matching profile from `references/profiles/`, classify subject, fill missing dimensions
 
 ## Image Generation Flow
 
@@ -165,13 +173,14 @@ Multi-image use cases: style transfer, character consistency, multi-image blendi
 Read `references/template-system.md` for the full template system. Overview:
 
 - **Search paths**: built-in (`references/templates/`) + user-installed (`~/.config/nanobanana/templates/`)
+- **Local vs remote**: `templates` / `use` operate on installed templates; `discover` operates on BananaHub catalog and installs only on demand
 - **Format**: `template.md` with YAML frontmatter and `type: prompt | workflow`
 - **Prompt templates**: produce a reusable prompt with variables, then generate or edit
 - **Workflow templates**: act as progressive-disclosure context; load the workflow, ask only for missing blockers, and execute step-by-step with `generate` / `edit` primitives when needed
 - **Built-in workflow example**: `consistent-character-storyboard` for character-consistency storyboard exploration
-- **Commands**: `templates` (list), `templates <name>` (details), `use <id> [desc]` (activate), `create-template` (create)
-- **Auto-matching**: Phase 2.1 suggests matching templates during intent recognition (progressive disclosure)
-- **Install more**: `npx bananahub add <user/repo>`
+- **Commands**: `templates` (list installed), `templates <name>` (details), `use <id> [desc]` (activate), `discover <need>` (search hub), `create-template` (create)
+- **Auto-matching**: Phase 2.1 suggests installed templates first; Phase 2.2 can search BananaHub when local coverage is weak
+- **Install more**: prefer `discover` inside the skill, or run `npx bananahub add <user/repo>` directly when the install target is already known
 - **Publishing rule**: when creating templates, save samples as `sample-{model-short}-{nn}.png` and make README list verified models, supported models, and sample-to-prompt mappings
 
 ## Safety Rules

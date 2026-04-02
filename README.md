@@ -68,6 +68,8 @@ This will:
 | `/nanobanana optimize <描述>` | Optimize prompt only (no generation) |
 | `/nanobanana generate <English prompt>` | Generate with an English prompt directly |
 | `/nanobanana models` | List available models |
+| `/nanobanana discover <need>` | Search BananaHub for matching templates and suggest install candidates |
+| `/nanobanana discover trending` | Show current trending BananaHub templates |
 | `/nanobanana init` | Check/setup environment |
 | `/nanobanana help` | Show usage instructions |
 
@@ -131,6 +133,7 @@ Built-in templates are reusable agent modules. Some are `prompt` templates that 
 | `/nanobanana templates <name>` | Show template details based on its type |
 | `/nanobanana use <name>` | Activate a prompt template or start a workflow template |
 | `/nanobanana use <name> <描述>` | Activate with custom variable overrides or workflow context |
+| `/nanobanana discover <need>` | Search BananaHub and recommend remote templates |
 | `/nanobanana create-template` | AI-guided prompt/workflow template creation wizard |
 
 ### Examples
@@ -150,6 +153,9 @@ Built-in templates are reusable agent modules. Some are `prompt` templates that 
 
 # Start a workflow template
 /nanobanana use consistent-character-storyboard
+
+# Ask Nano Banana to search BananaHub for a matching workflow
+/nanobanana discover logo 品牌标识
 
 # Use with flags
 /nanobanana use cyberpunk-city 上海外滩未来版 --aspect 9:16
@@ -185,11 +191,16 @@ Typical flow:
 
 ### Installing More Templates (BananaHub)
 
+Use `/nanobanana discover <need>` when you want the skill to search BananaHub for you, rank a few candidates, and continue directly into installation and activation.
+
 ```bash
-# Search the community hub
+# Ask the skill to search BananaHub
+/nanobanana discover repository explainer diagram
+
+# Search the hub directly from the CLI
 npx bananahub search <keyword>
 
-# Install a template from GitHub
+# Install a template from GitHub when the install target is already known
 npx bananahub add <username>/<repo>
 ```
 

@@ -124,7 +124,7 @@ Analyze user input and match the most appropriate enhancement Profile:
 4. Still uncertain → fall back to `general`
 5. **Principle: prefer falling back to general (less optimization) over guessing wrong and distorting intent**
 
-### Phase 2.1: Template Auto-Matching (Progressive Disclosure)
+### Phase 2.1: Local Template Auto-Matching (Progressive Disclosure)
 
 After profile matching, check if any installed template closely matches the user's input:
 
@@ -133,12 +133,12 @@ After profile matching, check if any installed template closely matches the user
 3. **Score**: count keyword overlaps; threshold ≥ 2 tag matches to suggest
 4. **Default mode** — if a match is found:
    ```
-   💡 发现匹配模板: cyberpunk-city (赛博朋克城市夜景)
-      适配度: ⭐⭐⭐ (3 个关键词命中)
+   Matching template found: cyberpunk-city (Cyberpunk City Nightscape)
+   Fit: ⭐⭐⭐ (3 keyword hits)
 
-   选择:
-   1. 激活模板
-   2. 继续常规优化
+   Choose:
+   1. Use template
+   2. Continue regular optimization
    ```
    If user chooses template → switch to `use <template-id>` flow.
    If user chooses regular → continue normal Phase 3.
@@ -146,6 +146,24 @@ After profile matching, check if any installed template closely matches the user
    When the matched template has `type: workflow`, activation means loading the workflow context and guiding the user step-by-step.
 5. **Direct mode** — auto-use best match if score ≥ 3, otherwise regular flow
 6. **Raw mode** — skip template matching entirely
+
+### Phase 2.2: BananaHub Remote Discovery (On Demand)
+
+Use remote discovery only when at least one of these is true:
+
+- the user explicitly asks Nano Banana to find or recommend a template
+- local matches are weak or missing
+- the task looks highly repeatable and likely has a reusable workflow on BananaHub
+
+Flow:
+
+1. Read `references/hub-discovery.md`
+2. Prefer curated BananaHub results by default; expand to merged/community results only when needed
+3. Rank by relevance first, then `pinned` / `featured` / curated / official
+4. Show a shortlist instead of a full dump
+5. Ask once whether to install the best match, inspect another candidate, or continue regular optimization
+6. If the user installs a candidate, immediately switch to the normal `use <template-id>` flow
+7. Do not load the full remote template body during broad search unless a shortlist candidate needs closer inspection
 
 **Special routing note**:
 - `手绘笔记 / sketchnote / 白板风 / 手账风` is **not** a standalone Profile

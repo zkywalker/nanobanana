@@ -16,6 +16,13 @@ Templates are loaded from two locations (merged). On ID conflict, user-installed
 
 Each path contains template directories and an auto-generated `.registry.json` index.
 
+## Discovery Surfaces
+
+- `templates`, `templates <name>`, `use`, and Phase 2.1 auto-matching operate on **installed** templates
+- `discover ...` operates on the **remote BananaHub catalog** and should follow `references/hub-discovery.md`
+
+Remote discovery should stay frontmatter-first. Do not load a remote template body until the user chooses a candidate or the shortlist is genuinely ambiguous.
+
 ## Template File Format
 
 Templates are agent-consumed `template.md` documents with two layers:
@@ -115,19 +122,29 @@ Full format spec: `references/template-format-spec.md`
 Example:
 
 ```text
-📦 可用模板 (N 个)
+Available templates (N)
 
-📷 写实摄影 (photo)
+Photo (photo)
   cyberpunk-city                  [prompt]    ⭐ beginner
 
-📋 通用工作流 (general)
+General workflows (general)
   consistent-character-storyboard [workflow]  ⭐⭐ intermediate
 
-用法: /nanobanana templates <name>  查看详情
-      /nanobanana use <name> [描述]  激活模板
-      /nanobanana create-template    创建新模板
-安装更多: npx bananahub search <关键词>
+Usage: /nanobanana templates <name>              Show details
+       /nanobanana use <name> [custom description]  Activate template
+       /nanobanana create-template               Create a new template
+Find more: /nanobanana discover <request>
 ```
+
+## `discover <request>` — Search BananaHub
+
+1. Read `references/hub-discovery.md`
+2. Search the BananaHub machine-readable catalog, not the visual homepage
+3. Prefer curated results by default
+4. Return a short ranked shortlist with `type`, `profile`, source layer, and `install_cmd`
+5. Ask once whether to install the best match, inspect another candidate, or continue without a template
+6. If the user approves installation, run `npx bananahub add ...` using the catalog's `install_cmd`
+7. After installation, immediately continue with the normal `use <template-id>` flow
 
 ## `templates <name>` — Show Template Details
 
@@ -139,7 +156,7 @@ Example:
 6. If `samples` entries exist in frontmatter, show sample image paths
 7. End with usage hint: `/nanobanana use <name>`
 
-## `use <template-id> [自定义描述]` — Activate Template
+## `use <template-id> [custom description]` — Activate Template
 
 1. **Locate template**: search both template paths for `<id>/template.md`
 2. **Read frontmatter** and determine `type`

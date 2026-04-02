@@ -69,6 +69,8 @@ claude skill install https://github.com/nano-banana-hub/nanobanana
 | `/nanobanana optimize <描述>` | 只优化 prompt，不生成 |
 | `/nanobanana generate <English prompt>` | 直接用英文 prompt 生成 |
 | `/nanobanana models` | 列出可用模型 |
+| `/nanobanana discover <需求>` | 搜索 BananaHub 并推荐可安装模板 |
+| `/nanobanana discover trending` | 查看当前热门 BananaHub 模板 |
 | `/nanobanana init` | 检查并初始化环境 |
 | `/nanobanana help` | 查看帮助 |
 
@@ -132,6 +134,7 @@ claude skill install https://github.com/nano-banana-hub/nanobanana
 | `/nanobanana templates <name>` | 按模板类型查看详情 |
 | `/nanobanana use <name>` | 激活 prompt 模板或启动 workflow 模板 |
 | `/nanobanana use <name> <描述>` | 带自定义变量或上下文激活模板 |
+| `/nanobanana discover <需求>` | 搜索 BananaHub 并推荐远程模板 |
 | `/nanobanana create-template` | 打开 AI 引导式 prompt/workflow 模板创建向导 |
 
 ### 模板示例
@@ -151,6 +154,9 @@ claude skill install https://github.com/nano-banana-hub/nanobanana
 
 # 启动 workflow 模板
 /nanobanana use consistent-character-storyboard
+
+# 让 Nano Banana 去 BananaHub 找合适模板
+/nanobanana discover logo 品牌标识
 
 # 配合参数使用
 /nanobanana use cyberpunk-city 上海外滩未来版 --aspect 9:16
@@ -186,11 +192,16 @@ claude skill install https://github.com/nano-banana-hub/nanobanana
 
 ### 安装更多模板（BananaHub）
 
+如果你想让 skill 自动去 BananaHub 搜索、排序并衔接安装与激活，优先直接用 `/nanobanana discover <需求>`。
+
 ```bash
-# 搜索社区模板
+# 让 skill 代你搜索 BananaHub
+/nanobanana discover 代码库讲解图
+
+# 直接用 CLI 搜索 BananaHub
 npx bananahub search <关键词>
 
-# 从 GitHub 安装模板
+# 已知安装目标时，直接从 GitHub 安装
 npx bananahub add <username>/<repo>
 ```
 
