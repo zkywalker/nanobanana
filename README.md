@@ -2,7 +2,7 @@
 
 [简体中文说明](./README.zh-CN.md)
 
-A [Claude Code Skill](https://docs.anthropic.com/en/docs/claude-code/skills) and Open Agent Skill that turns Chinese image descriptions into optimized English prompts, then generates or edits images via Gemini from the same `/bananahub` entry point.
+A skill for Gemini image generation and editing that can normalize non-English image requests into optimized English prompts by default, then generate or edit images from the same `/bananahub` entry point.
 
 ## Quick Start
 
@@ -29,9 +29,9 @@ BananaHub's prompt and workflow design is distilled from official Google / Gemin
 
 ## What It Does
 
-1. **Smart prompt optimization** — Translates Chinese descriptions into high-quality English prompts, fixing common issues (keyword dumps, SD/MJ syntax, negative phrasing, etc.)
+1. **Smart prompt optimization** — Translates non-English descriptions into high-quality English prompts by default, fixing common issues (keyword dumps, SD/MJ syntax, negative phrasing, etc.)
 2. **Conservative intent-aware enhancement** — Detects image intent (photo, illustration, diagram, text-heavy, minimal, sticker, 3D, product, concept-art) and applies domain-specific enhancements without inventing unnecessary style decisions
-3. **In-image text preservation** — Keeps Chinese text meant to appear in the image (e.g. `写着"生日快乐"的蛋糕` → `a cake with the text "生日快乐"`)
+3. **In-image text preservation** — Keeps source-language text meant to appear in the image (e.g. `写着"生日快乐"的蛋糕` → `a cake with the text "生日快乐"`)
 4. **Constraint-first workflow** — Extracts exact text, keep/avoid constraints, target use, and edit invariants before generating
 5. **Multiple generation modes** — Default (interactive), Direct (no confirmations), and Raw (translate-only)
 6. **Template-driven reuse and distribution** — Uses built-in templates, supports AI-guided template creation, and connects to BananaHub for searchable installation
@@ -41,7 +41,7 @@ BananaHub's prompt and workflow design is distilled from official Google / Gemin
 - **Ask instead of guess** when multiple plausible directions would materially change the result
 - **Do not add high-impact details lightly**: background, palette, lighting mood, lens language, texture, extra props
 - **Treat text and structure as locked content** for posters, logos, diagrams, and information graphics
-- **Use English for the final prompt by default**; preserve original language only for in-image text and locked names/labels
+- **Standardize the final prompt in English by default** for consistency; preserve original language only for in-image text and locked names/labels
 - **For edits, preserve invariants first** and change only the requested delta
 - **Iterate one major variable at a time** for follow-up revisions
 
@@ -91,7 +91,7 @@ python3 -m pip install --user google-genai pillow
 
 | Command | Description |
 |---|---|
-| `/bananahub <中文描述>` | Optimize prompt + generate image |
+| `/bananahub <description>` | Optimize prompt + generate image |
 | `/bananahub edit <描述> --input <图片>` | Edit an existing image with a text prompt |
 | `/bananahub optimize <描述>` | Optimize prompt only (no generation) |
 | `/bananahub generate <English prompt>` | Generate with an English prompt directly |
@@ -254,14 +254,14 @@ Publishing checklist:
 ## How Prompt Optimization Works
 
 ```
-User input (Chinese)
+User input (non-English or mixed-language)
   │
   ├─ Phase 0: Constraint Extraction
   │   └─ exact text / keep / avoid / platform / invariants
   │
   ├─ Phase 1: Base Optimization (silent)
   │   ├─ Format correction (fix keyword dumps, SD syntax, etc.)
-  │   ├─ Smart translation (descriptive → English, in-image text → preserved)
+  │   ├─ Smart translation (descriptive text → English, in-image text → preserved)
   │   └─ Structuring + conservative guardrails
   │
   ├─ Phase 2: Intent Recognition

@@ -1,6 +1,6 @@
 # Prompt Optimization Pipeline
 
-When the user provides a Chinese description, process it through this pipeline (executed by you, not the script).
+When the user provides a non-English or mixed-language description, process it through this pipeline (executed by you, not the script).
 
 ## Phase 0: Constraint Extraction
 
@@ -47,7 +47,7 @@ Refer to `references/prompt-guide.md` error detection rules:
 Translate descriptions into natural English, distinguishing two types of text:
 
 **Language policy for the final prompt**:
-- The final prompt should be written in natural English by default
+- The final prompt should be standardized into natural English by default
 - Preserve original-language text only for:
   - in-image text that must appear verbatim
   - proper nouns / brand names / titles that should not be translated

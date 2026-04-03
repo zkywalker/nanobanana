@@ -1,7 +1,7 @@
 ---
 name: bananahub
 description: >
-  Agent-native Gemini image workflow for `/bananahub`. Optimizes Chinese prompts into English,
+  Agent-native Gemini image workflow for `/bananahub`. Normalizes non-English prompts into English by default,
   generates or edits images, lists or falls back across Gemini image models, and discovers or uses
   BananaHub prompt and workflow templates. Trigger only when the user explicitly mentions
   bananahub / BananaHub, uses the `/bananahub` command, or uses legacy nanobanana phrasing for the
@@ -26,14 +26,14 @@ user_invocable: true
 
 # BananaHub
 
-Generate or edit Gemini images from Chinese prompts inside one `/bananahub` workflow. BananaHub keeps prompt optimization, conservative enhancement, model fallback, image editing, template use, and BananaHub discovery in a single skill instead of splitting them across separate installs.
+Generate or edit Gemini images from non-English or mixed-language requests inside one `/bananahub` workflow. BananaHub keeps prompt optimization, conservative enhancement, model fallback, image editing, template use, and BananaHub discovery in a single skill instead of splitting them across separate installs.
 
 ## Quick Start
 
 - Install via Open Agent Skills: `npx skills add https://github.com/bananahub-ai/bananahub-skill --skill bananahub`
 - Install in Claude Code directly: `claude skill install https://github.com/bananahub-ai/bananahub-skill`
 - Run setup once: `/bananahub init`
-- Generate from Chinese: `/bananahub 一只橘猫趴在键盘上打盹`
+- Generate from a natural-language request: `/bananahub 一只橘猫趴在键盘上打盹`
 - Edit an image: `/bananahub edit 把背景换成海滩 --input photo.png`
 - Discover a reusable template: `/bananahub discover 代码库讲解图`
 
