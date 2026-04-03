@@ -1,0 +1,7 @@
+interface:
+  display_name: "BananaHub"
+  short_description: "Gemini image generation, editing, and templates"
+  default_prompt: "Use $bananahub to optimize a Chinese image request, generate or edit with Gemini, or discover a matching template."
+
+policy:
+  allow_implicit_invocation: false

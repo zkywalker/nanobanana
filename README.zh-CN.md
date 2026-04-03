@@ -2,15 +2,28 @@
 
 [English README](./README.md)
 
-BananaHub Skill 是一个 [Claude Code Skill](https://docs.anthropic.com/en/docs/claude-code/skills)。它会把中文图像需求整理成更适合模型理解的英文 prompt，再通过 Gemini API 生成或编辑图片。
+BananaHub Skill 是一个 [Claude Code Skill](https://docs.anthropic.com/en/docs/claude-code/skills)，也可以作为 Open Agent Skill 安装。它会把中文图像需求整理成更适合模型理解的英文 prompt，再通过 Gemini 在同一个 `/bananahub` 入口里完成生成、编辑和模板化复用。
+
+## 快速开始
+
+```bash
+# Open Agent Skills / skills.sh 安装方式
+npx skills add https://github.com/bananahub-ai/bananahub-skill --skill bananahub
+
+# 或直接安装到 Claude Code
+claude skill install https://github.com/bananahub-ai/bananahub-skill
+
+/bananahub init
+/bananahub 一只橘猫趴在键盘上打盹
+```
 
 ## 产品定位
 
-BananaHub 不只是一个 prompt 优化器，它更像是 Claude Code 里的 Gemini 生图工作流：
+BananaHub 的目标是用一个 skill 覆盖完整的 Gemini 生图工作流，而不是拆成很多小入口：
 
-- **Agent-native 交互**：优化、出图、编辑、套模板、继续迭代，都在同一段对话里完成
+- **一个命令面**：优化、出图、编辑、套模板、继续迭代，都在同一段对话里通过 `/bananahub` 完成
 - **渐进式披露引导**：低风险整理默认静默完成，只有在歧义会明显影响结果时才追问，命中高匹配模板时才提示切换
-- **可安装的模板生态**：常见任务由内置模板覆盖，额外能力通过 BananaHub 按需安装；模板既可以是单步 prompt，也可以是多步 workflow，不把基础 skill 做成一个大杂烩
+- **可安装的模板生态**：常见任务由内置模板覆盖，额外能力通过 BananaHub 按需安装；模板既可以是单步 prompt，也可以是多步 workflow，但基础 skill 仍保持单一入口
 
 ## 主要能力
 
@@ -33,8 +46,9 @@ BananaHub 不只是一个 prompt 优化器，它更像是 Claude Code 里的 Gem
 ## 安装
 
 ```bash
-claude skill install /path/to/bananahub-skill
-# 或直接从 GitHub 安装
+npx skills add https://github.com/bananahub-ai/bananahub-skill --skill bananahub
+
+# 或直接安装到 Claude Code
 claude skill install https://github.com/bananahub-ai/bananahub-skill
 ```
 
@@ -54,9 +68,15 @@ claude skill install https://github.com/bananahub-ai/bananahub-skill
 
 这个命令会做三件事：
 
-- 安装 Python 依赖：`google-genai`、`pillow`
+- 检查 Python 依赖：`google-genai`、`pillow`
 - 引导你把 Gemini API Key 配到支持的配置来源里
-- 测试 API 是否可用
+- 在基础环境就绪后测试 API 是否可用
+
+如果你想先手动装依赖，可以直接运行：
+
+```bash
+python3 -m pip install --user google-genai pillow
+```
 
 **Gemini API Key 申请地址**：https://aistudio.google.com/apikey（有免费额度）
 

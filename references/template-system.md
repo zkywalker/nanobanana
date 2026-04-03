@@ -11,7 +11,7 @@ Templates support progressive disclosure: they can be auto-suggested when contex
 
 Templates are loaded from two locations (merged). On ID conflict, user-installed wins:
 
-1. **Built-in** (shipped with skill): `~/.claude/skills/bananahub/references/templates/`
+1. **Built-in** (shipped with skill): `{baseDir}/references/templates/`
 2. **User-installed** (via `npx bananahub add`): `~/.config/bananahub/templates/`
 
 Each path contains template directories and an auto-generated `.registry.json` index.

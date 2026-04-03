@@ -4,14 +4,14 @@ When the user runs `init`, actively diagnose and fix issues — don't just repor
 
 ## Step 1: Run diagnostics
 
-Run `python3 ~/.claude/skills/bananahub/scripts/bananahub.py init --skip-test` first (skip API test until basics are ready). Parse the JSON output.
+Run `python3 {baseDir}/scripts/bananahub.py init --skip-test` first (skip API test until basics are ready). Parse the JSON output.
 
 ## Step 2: Fix missing dependencies automatically
 
 If `dependencies.ok` is false:
-- **Directly run** `pip install google-genai pillow --break-system-packages` to install them
+- **Directly run** `python3 -m pip install --user google-genai pillow` to install them
 - Do not just tell the user to install — install for them
-- If install fails, show the error and suggest the user run it manually with sudo or in a venv
+- If install fails because the environment is externally managed, show the error and suggest using a virtual environment
 
 ## Step 3: Fix missing config file
 
@@ -36,7 +36,7 @@ If config source exists but `api_key.ok` is false:
 ## Step 5: Run full diagnostics with API test
 
 After dependencies and config are in place:
-- Run `python3 ~/.claude/skills/bananahub/scripts/bananahub.py init` (without --skip-test)
+- Run `python3 {baseDir}/scripts/bananahub.py init` (without --skip-test)
 - If API test passes → report success, environment is ready
 - If API test fails:
   - **Auth error (401/403)**: API key is invalid — ask user to double-check and provide a new one

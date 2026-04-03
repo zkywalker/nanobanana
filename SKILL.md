@@ -1,30 +1,52 @@
 ---
 name: bananahub
 description: >
-  BananaHub image generation and template discovery assistant. Optimizes Chinese prompts into English, calls Gemini API to generate or edit images,
-  and can discover/install matching prompt or workflow templates from BananaHub when the user explicitly asks or when local templates are a weak match.
-  Only activate when the user explicitly mentions bananahub / BananaHub, or clearly uses legacy Nano Banana phrasing for the same workflow, or uses the /bananahub command.
-  Do NOT activate on generic image-generation phrases like "生成图片" or "画一个".
-  Typical triggers: /bananahub command, "用 bananahub 画", "bananahub 生图",
-  "bananahub 生成", "bananahub 优化提示词", "bananahub 找模板",
-  legacy phrases like "用 nanobanana 画" or "nanobanana 找模板", and "/bananahub discover".
+  Agent-native Gemini image workflow for `/bananahub`. Optimizes Chinese prompts into English,
+  generates or edits images, lists or falls back across Gemini image models, and discovers or uses
+  BananaHub prompt and workflow templates. Trigger only when the user explicitly mentions
+  bananahub / BananaHub, uses the `/bananahub` command, or uses legacy nanobanana phrasing for the
+  same workflow. Do NOT activate on generic image-generation requests like "生成图片" or "画一个".
+  Typical triggers: "/bananahub", "用 bananahub 画", "bananahub 生图", "bananahub 优化提示词",
+  "bananahub 找模板", "用 nanobanana 画", "nanobanana 找模板", and "/bananahub discover".
+metadata:
+  version: 0.1.0
+  author: bananahub-ai
+  emoji: 🍌
+  requires:
+    bins:
+      - python3
+    python:
+      - google-genai
+      - pillow
+    env:
+      - GEMINI_API_KEY
+  primaryEnv: GEMINI_API_KEY
 user_invocable: true
 ---
 
-# BananaHub Image Generation Assistant
+# BananaHub
 
-You are the BananaHub image generation and template discovery assistant. Your job is to optimize the user's Chinese image descriptions into high-quality English prompts, call the Gemini API to generate or edit images, and discover/install matching BananaHub templates when that is the best fit.
+Generate or edit Gemini images from Chinese prompts inside one `/bananahub` workflow. BananaHub keeps prompt optimization, conservative enhancement, model fallback, image editing, template use, and BananaHub discovery in a single skill instead of splitting them across separate installs.
+
+## Quick Start
+
+- Install via Open Agent Skills: `npx skills add https://github.com/bananahub-ai/bananahub-skill --skill bananahub`
+- Install in Claude Code directly: `claude skill install https://github.com/bananahub-ai/bananahub-skill`
+- Run setup once: `/bananahub init`
+- Generate from Chinese: `/bananahub 一只橘猫趴在键盘上打盹`
+- Edit an image: `/bananahub edit 把背景换成海滩 --input photo.png`
+- Discover a reusable template: `/bananahub discover 代码库讲解图`
 
 ## Key Paths
 
-- **Generation script**: `~/.claude/skills/bananahub/scripts/bananahub.py`
-- **Legacy compatibility script**: `~/.claude/skills/bananahub/scripts/nanobanana.py`
+- **Generation script**: `{baseDir}/scripts/bananahub.py`
+- **Legacy compatibility script**: `{baseDir}/scripts/nanobanana.py`
 - **Prompt optimization rules**: `references/prompt-guide.md` — read during Phase 1 (base optimization)
 - **Enhancement profiles**: `references/profiles/{name}.md` — read during Phase 3 (on-demand)
 - **Official references**: `references/official-sources.md` — authoritative source URLs, core example library
 - **Template system**: `references/template-system.md` — read when handling templates/use/create-template commands
 - **Hub discovery guide**: `references/hub-discovery.md` — read when handling `discover` or when local template matching is weak
-- **Template files**: `references/templates/<id>/template.md` (built-in) + `~/.config/bananahub/templates/<id>/template.md` (user-installed)
+- **Template files**: `{baseDir}/references/templates/<id>/template.md` (built-in) + `~/.config/bananahub/templates/<id>/template.md` (user-installed)
 - **Init guide**: `references/init-guide.md` — read when handling `init` command
 - **Optimization pipeline**: `references/optimization-pipeline.md` — read when optimizing prompts
 - **Template format spec**: `references/template-format-spec.md` — detailed field definitions, repo structure, sample requirements
@@ -55,7 +77,7 @@ Route user input to the appropriate action based on arguments:
 | `edit <description> --input <image-path> [--ref <reference-image>...]` | Edit an existing image: optimize prompt → call edit subcommand |
 | `optimize <description>` | Optimize prompt only; display result without generating |
 | `generate <English prompt>` | Generate image directly with given English prompt (skip optimization) |
-| `models` | Run `python3 scripts/bananahub.py models` to query image-capable models from API |
+| `models` | Run `python3 {baseDir}/scripts/bananahub.py models` to query image-capable models from API |
 | `templates` | Read `references/template-system.md`, then list all templates grouped by profile and type |
 | `templates <name>` | Read `references/template-system.md`, parse frontmatter `type`, then show prompt-template or workflow-template details accordingly |
 | `use <template-id> [custom description]` | Read `references/template-system.md`, parse frontmatter `type`, then either generate from a prompt template or activate a workflow template |
@@ -66,8 +88,8 @@ Route user input to the appropriate action based on arguments:
 
 Note:
 - `optimize`, `--direct`, and `--raw` are **skill-layer controls** interpreted by you before invoking the script
-- Do **not** pass `--direct` or `--raw` through to `scripts/bananahub.py`
-- `discover` is also a **skill-layer command**: use BananaHub machine-readable files and `npx bananahub add ...`, not `scripts/bananahub.py`
+- Do **not** pass `--direct` or `--raw` through to `{baseDir}/scripts/bananahub.py`
+- `discover` is also a **skill-layer command**: use BananaHub machine-readable files and `npx bananahub add ...`, not `{baseDir}/scripts/bananahub.py`
 
 Optional flags (append to any generation command):
 - `--model <model_id>` — specify model
@@ -120,7 +142,7 @@ Read `references/optimization-pipeline.md` for the full pipeline. Overview:
 
 1. Build command:
    ```bash
-   python3 ~/.claude/skills/bananahub/scripts/bananahub.py generate "<prompt>" [--aspect RATIO] [--model MODEL] [--output PATH]
+   python3 {baseDir}/scripts/bananahub.py generate "<prompt>" [--aspect RATIO] [--model MODEL] [--output PATH]
    ```
 2. Execute script and parse JSON output
 3. **Automatic model fallback**: on server error (500/502/503/504), tries next model:
@@ -145,7 +167,7 @@ Read `references/optimization-pipeline.md` for the full pipeline. Overview:
 5. **Optimize edit prompt**: run Phase 1 only (skip Phase 2/3); keep conservative, isolate the delta
 6. **Build command**:
    ```bash
-   python3 ~/.claude/skills/bananahub/scripts/bananahub.py edit "<prompt>" --input <image_path> [--ref <ref1> ...] [--model MODEL] [--output PATH]
+   python3 {baseDir}/scripts/bananahub.py edit "<prompt>" --input <image_path> [--ref <ref1> ...] [--model MODEL] [--output PATH]
    ```
    `--ref` accepts up to 13 reference images. Total images (input + refs) ≤ 14.
 7. On success:

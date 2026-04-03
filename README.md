@@ -2,15 +2,28 @@
 
 [简体中文说明](./README.zh-CN.md)
 
-A [Claude Code Skill](https://docs.anthropic.com/en/docs/claude-code/skills) that turns Chinese image descriptions into optimized English prompts and generates or edits images via the Gemini API.
+A [Claude Code Skill](https://docs.anthropic.com/en/docs/claude-code/skills) and Open Agent Skill that turns Chinese image descriptions into optimized English prompts, then generates or edits images via Gemini from the same `/bananahub` entry point.
 
-## Product Summary
+## Quick Start
 
-BananaHub is not just a prompt optimizer. It is an agent-native Gemini image workflow inside Claude Code:
+```bash
+# Open Agent Skills / skills.sh
+npx skills add https://github.com/bananahub-ai/bananahub-skill --skill bananahub
 
-- **Agent-native runtime** — optimization, generation, editing, template use, and iteration happen in the same conversation
-- **Progressive disclosure guidance** — the skill stays quiet on low-risk cleanup, asks only when ambiguity would materially change the result, and suggests templates only when there is a strong match
-- **Installable template ecosystem** — built-ins cover common jobs, while BananaHub lets users discover and install extra prompt or workflow modules without bloating the base skill
+# Or install directly in Claude Code
+claude skill install https://github.com/bananahub-ai/bananahub-skill
+
+/bananahub init
+/bananahub 一只橘猫趴在键盘上打盹
+```
+
+## Why BananaHub
+
+BananaHub is one installable skill that keeps the whole Gemini image workflow together:
+
+- **One command surface** — optimize, generate, edit, iterate, use templates, and discover more from `/bananahub`
+- **Progressive disclosure guidance** — low-risk cleanup stays quiet; the skill only asks when ambiguity would materially change the result
+- **Reusable template ecosystem** — built-ins cover common jobs, while BananaHub lets users discover and install extra prompt or workflow modules without splitting the base skill into multiple SKUs
 
 ## What It Does
 
@@ -33,8 +46,9 @@ BananaHub is not just a prompt optimizer. It is an agent-native Gemini image wor
 ## Installation
 
 ```bash
-claude skill install /path/to/bananahub-skill
-# or from GitHub
+npx skills add https://github.com/bananahub-ai/bananahub-skill --skill bananahub
+
+# or install directly in Claude Code
 claude skill install https://github.com/bananahub-ai/bananahub-skill
 ```
 
@@ -52,10 +66,16 @@ After installation, run the init command to configure your environment:
 /bananahub init
 ```
 
-This will:
-- Install Python dependencies (`google-genai`, `pillow`)
+This setup flow will:
+- Check Python dependencies (`google-genai`, `pillow`)
 - Guide you through setting up your Gemini API key in one of the supported config sources
-- Test API connectivity
+- Test API connectivity once the basics are ready
+
+If you prefer to preinstall dependencies manually:
+
+```bash
+python3 -m pip install --user google-genai pillow
+```
 
 **Get a Gemini API key**: https://aistudio.google.com/apikey (free tier available)
 
