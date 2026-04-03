@@ -33,9 +33,9 @@ BananaHub is not just a prompt optimizer. It is an agent-native Gemini image wor
 ## Installation
 
 ```bash
-claude skill install /path/to/banana-hub-skill
+claude skill install /path/to/bananahub-skill
 # or from GitHub
-claude skill install https://github.com/bananahub-ai/banana-hub-skill
+claude skill install https://github.com/bananahub-ai/bananahub-skill
 ```
 
 Primary command: `/bananahub`
@@ -258,7 +258,7 @@ User input (Chinese)
 ## Project Structure
 
 ```text
-banana-hub-skill/
+bananahub-skill/
 ├── SKILL.md                          # Skill definition (Claude Code entry point)
 ├── scripts/
 │   ├── bananahub.py                  # Primary image generation entrypoint

@@ -161,7 +161,7 @@ BananaHub 的站点同时服务三类对象：
   "repos": [
     "user-a/bananahub-cyberpunk",
     "user-b/bananahub-templates",
-    "bananahub-ai/banana-hub-skill"
+    "bananahub-ai/bananahub-skill"
   ]
 }
 ```
@@ -287,4 +287,4 @@ BananaHub 的站点同时服务三类对象：
 | `bananahub`（npm） | CLI 工具 | ✅ 已构建，路径：`/home/coder/project/nano-banana-hub/bananahub/` |
 | `bananahub-ai.github.io` | Hub 静态站点 | ✅ 已上线 |
 | `bananahub-api` | 安装统计的 Cloudflare Worker | ✅ 已上线 |
-| `banana-hub-skill` | 官方 skill 与内置模板集合 | ✅ 已上线 |
+| `bananahub-skill` | 官方 skill 与内置模板集合 | ✅ 已上线 |

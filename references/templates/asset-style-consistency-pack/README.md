@@ -5,7 +5,7 @@ A BananaHub workflow template for building a consistent asset pack from local im
 ## Install
 
 ```bash
-npx bananahub add bananahub-ai/banana-hub-skill/asset-style-consistency-pack
+npx bananahub add bananahub-ai/bananahub-skill/asset-style-consistency-pack
 ```
 
 ## Verified Models

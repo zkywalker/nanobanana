@@ -92,7 +92,7 @@ BananaHub candidate templates
 1. app-web-logo-system [workflow]
    Match: logo / brand / app icon
    Source: curated, official
-   Install: bananahub add bananahub-ai/banana-hub-skill/app-web-logo-system
+   Install: bananahub add bananahub-ai/bananahub-skill/app-web-logo-system
 
 2. readme-launch-visual [workflow]
    Match: launch / hero / banner

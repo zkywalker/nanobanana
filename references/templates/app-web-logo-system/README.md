@@ -5,7 +5,7 @@ A BananaHub workflow template for generating app and web logos with platform-awa
 ## Install
 
 ```bash
-npx bananahub add bananahub-ai/banana-hub-skill/app-web-logo-system
+npx bananahub add bananahub-ai/bananahub-skill/app-web-logo-system
 ```
 
 ## Best Practices

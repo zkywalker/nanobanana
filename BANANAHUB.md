@@ -157,7 +157,7 @@ Static site (GitHub Pages)
   "repos": [
     "user-a/bananahub-cyberpunk",
     "user-b/bananahub-templates",
-    "bananahub-ai/banana-hub-skill"
+    "bananahub-ai/bananahub-skill"
   ]
 }
 ```
@@ -278,7 +278,7 @@ Static site (GitHub Pages)
 | `bananahub` (npm) | CLI tool | ✅ Built at `/home/coder/project/nano-banana-hub/bananahub/` |
 | `bananahub-ai.github.io` | Hub static site | ✅ Live |
 | `bananahub-api` | Cloudflare Worker for install tracking | ✅ Live |
-| `banana-hub-skill` | Official skill + built-in template collection | ✅ Live |
+| `bananahub-skill` | Official skill + built-in template collection | ✅ Live |
 
 ## Open Questions
 

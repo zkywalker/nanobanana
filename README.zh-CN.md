@@ -33,9 +33,9 @@ BananaHub 不只是一个 prompt 优化器，它更像是 Claude Code 里的 Gem
 ## 安装
 
 ```bash
-claude skill install /path/to/banana-hub-skill
+claude skill install /path/to/bananahub-skill
 # 或直接从 GitHub 安装
-claude skill install https://github.com/bananahub-ai/banana-hub-skill
+claude skill install https://github.com/bananahub-ai/bananahub-skill
 ```
 
 主命令：`/bananahub`
@@ -259,7 +259,7 @@ npx bananahub add <username>/<repo>
 ## 项目结构
 
 ```text
-banana-hub-skill/
+bananahub-skill/
 ├── SKILL.md                          # Skill 定义（Claude Code 入口）
 ├── scripts/
 │   ├── bananahub.py                  # 主图片生成入口

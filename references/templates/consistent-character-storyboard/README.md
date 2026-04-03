@@ -5,7 +5,7 @@ A BananaHub workflow template for role-consistent storyboard exploration. It hel
 ## Install
 
 ```bash
-npx bananahub add bananahub-ai/banana-hub-skill/consistent-character-storyboard
+npx bananahub add bananahub-ai/bananahub-skill/consistent-character-storyboard
 ```
 
 ## Verified Models

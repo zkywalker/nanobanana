@@ -5,7 +5,7 @@ A BananaHub workflow template for converting README copy or product positioning 
 ## Install
 
 ```bash
-npx bananahub add bananahub-ai/banana-hub-skill/readme-launch-visual
+npx bananahub add bananahub-ai/bananahub-skill/readme-launch-visual
 ```
 
 ## Verified Models

@@ -5,7 +5,7 @@ A BananaHub workflow template for turning real repository context into one clean
 ## Install
 
 ```bash
-npx bananahub add bananahub-ai/banana-hub-skill/repo-explainer-diagram
+npx bananahub add bananahub-ai/bananahub-skill/repo-explainer-diagram
 ```
 
 ## Verified Models
