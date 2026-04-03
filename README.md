@@ -25,6 +25,8 @@ BananaHub is one installable skill that keeps the whole Gemini image workflow to
 - **Progressive disclosure guidance** — low-risk cleanup stays quiet; the skill only asks when ambiguity would materially change the result
 - **Reusable template ecosystem** — built-ins cover common jobs, while BananaHub lets users discover and install extra prompt or workflow modules without splitting the base skill into multiple SKUs
 
+BananaHub's prompt and workflow design is distilled from official Google / Gemini image-generation docs, prompt guides, and public best practices, then adapted into a constraint-first, agent-native workflow. See [official source references](references/official-sources.md).
+
 ## What It Does
 
 1. **Smart prompt optimization** — Translates Chinese descriptions into high-quality English prompts, fixing common issues (keyword dumps, SD/MJ syntax, negative phrasing, etc.)
