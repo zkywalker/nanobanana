@@ -5,6 +5,7 @@ title: 本地素材风格统一工作流
 title_en: Local Asset Style Consistency Workflow
 description: 基于本地输入图、参考图和锁定约束，先做一个统一风格样张，再稳定地扩展成一组风格一致的素材。
 author: bananahub
+license: CC-BY-4.0
 version: 1.0.0
 profile: general
 tags: [素材包, 风格统一, 多图一致性, reference, batch, consistency, edit]

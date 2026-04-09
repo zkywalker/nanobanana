@@ -4,6 +4,7 @@ type: prompt
 title: 信息图/流程图
 title_en: Infographic & Flowchart
 author: bananahub
+license: CC-BY-4.0
 version: 1.0.0
 profile: diagram
 tags: [信息图, 流程图, 图表, 知识卡片, 教程]

@@ -52,6 +52,7 @@ title: 角色一致性分镜工作流
 title_en: Consistent Character Storyboard Workflow
 description: 多步角色一致性分镜工作流      # Optional short description
 author: github-username
+license: CC-BY-4.0
 version: 1.0.0
 
 # === Generation Config ===
@@ -87,6 +88,7 @@ updated: 2026-03-31
 | `title_en` | Yes | Hub display, English search |
 | `description` | Recommended | Hub cards, listing |
 | `author` | Yes | Attribution |
+| `license` | Recommended locally, yes for publishing | Hub display, legal clarity |
 | `version` | Yes | Update detection |
 | `profile` | Yes | Grouping, profile alignment |
 | `aspect` | Yes | Default generation parameter |
@@ -195,6 +197,7 @@ Published/community template repos should include a `README.md` with at least th
 ## Install
 ## Verified Models
 ## Supported Models
+## License
 ## Sample Outputs
 ```
 

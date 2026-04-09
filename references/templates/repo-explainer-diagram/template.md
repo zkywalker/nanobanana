@@ -5,6 +5,7 @@ title: 代码库讲解图工作流
 title_en: Repository Explainer Diagram Workflow
 description: 先读取 README、目录结构或代码摘要，再把代码库讲成一张结构清晰的信息图或架构讲解图。
 author: bananahub
+license: CC-BY-4.0
 version: 1.0.0
 profile: diagram
 tags: [代码库, 项目结构, 架构图, README, repo, codebase, architecture, explainer]

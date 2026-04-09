@@ -4,6 +4,7 @@ type: prompt
 title: 极简手机壁纸
 title_en: Minimal Phone Wallpaper
 author: bananahub
+license: CC-BY-4.0
 version: 1.0.0
 profile: minimal
 tags: [极简, 壁纸, 手机, 留白, 简约]

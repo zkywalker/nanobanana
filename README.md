@@ -381,6 +381,17 @@ bananahub-skill/
 - Gemini API key from Google AI Studio or a Gemini-compatible relay provider
 - Billing/quota depends on Google's current policy, your model choice, and your account/region
 
+## Contributing
+
+Code and docs contributions to this repo are accepted under MIT and should be signed off with:
+
+```bash
+git commit -s -m "feat: your change"
+```
+
+If you contribute built-in templates under `references/templates/`, keep the frontmatter `license` field explicit, keep the samples redistributable, and treat template content as CC BY 4.0 unless the template directory states otherwise.
+
 ## License
 
-MIT
+- Code, scripts, and general repo docs: MIT
+- Built-in templates and bundled sample assets under `references/templates/`: CC BY 4.0 unless a template directory states otherwise

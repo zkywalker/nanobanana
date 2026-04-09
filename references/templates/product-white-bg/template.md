@@ -4,6 +4,7 @@ type: prompt
 title: 电商白底产品图
 title_en: E-commerce Product on White
 author: bananahub
+license: CC-BY-4.0
 version: 1.0.0
 profile: product
 tags: [产品图, 电商, 白底, 商品, 淘宝]

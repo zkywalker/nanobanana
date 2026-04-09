@@ -4,6 +4,7 @@ type: prompt
 title: Q版贴纸表情包
 title_en: Cute Chibi Sticker Pack
 author: bananahub
+license: CC-BY-4.0
 version: 1.0.0
 profile: sticker
 tags: [贴纸, 表情包, Q版, 可爱, chibi]

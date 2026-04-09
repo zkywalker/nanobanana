@@ -4,6 +4,7 @@ type: workflow
 title: 角色一致性分镜工作流
 title_en: Consistent Character Storyboard Workflow
 author: bananahub
+license: CC-BY-4.0
 version: 1.0.0
 profile: general
 tags: [分镜, 角色一致性, 故事板, storyboard, contact-sheet, multi-shot]

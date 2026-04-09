@@ -5,6 +5,7 @@ title: README 启动视觉工作流
 title_en: README Launch Visual Workflow
 description: 从 README、定位文案或功能清单里抽出一句主张和一张主视觉，生成适合首页头图、OG 封面或发布海报的图像。
 author: bananahub
+license: CC-BY-4.0
 version: 1.0.0
 profile: text-heavy
 tags: [README, 头图, 海报, 封面, OG, launch, hero, banner]

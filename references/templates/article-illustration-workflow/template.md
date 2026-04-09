@@ -5,6 +5,7 @@ title: 文章配图工作流
 title_en: Article Illustration Workflow
 description: 先读取文章或段落，再规划配图大纲，逐张生成适合博客、教程和文档的说明图或 editorial visual。
 author: bananahub
+license: CC-BY-4.0
 version: 1.0.0
 profile: diagram
 tags: [文章配图, 文章插图, 博客配图, 教程配图, blog, article, editorial, tutorial, docs, explainer]

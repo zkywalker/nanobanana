@@ -4,6 +4,7 @@ type: prompt
 title: 赛博朋克城市夜景
 title_en: Cyberpunk City Nightscape
 author: bananahub
+license: CC-BY-4.0
 version: 1.0.0
 profile: photo
 tags: [赛博朋克, 城市, 夜景, 科幻, neon]
