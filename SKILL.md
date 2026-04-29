@@ -267,16 +267,16 @@ Multi-image use cases: style transfer, character consistency, multi-image blendi
 Read `references/template-system.md` for the full template system. Overview:
 
 - **Search paths**: built-in (`references/templates/`) + user-installed (`~/.config/bananahub/templates/`)
-- **Local vs remote**: `templates` / `use` operate on installed templates; `discover` operates on BananaHub catalog and installs only on demand
+- **Local vs remote**: `templates` / `use` operate on installed templates; `discover` operates on BananaHub catalog, including the official `bananahub-ai/templates` library, and installs only on demand
 - **Format**: `template.md` with YAML frontmatter and `type: prompt | workflow`
 - **Prompt templates**: produce a reusable prompt with variables, then generate or edit
 - **Workflow templates**: act as progressive-disclosure context; load the workflow, ask only for missing blockers, and execute step-by-step with `generate` / `edit` primitives when needed
 - **Model transparency**: when a template or heuristic selects `gpt-image-2` or Gemini/Nano Banana automatically, state that recommendation explicitly instead of hiding the model choice
-- **Built-in workflow example**: `consistent-character-storyboard` for character-consistency storyboard exploration
+- **Built-in starter examples**: `info-diagram` for one-page infographics, `article-one-page-summary` for article explainers, `background-replace-edit` for edit workflows
 - **Commands**: `templates` (list installed), `templates <name>` (details), `use <id> [desc]` (activate), `discover <need>` (search hub), `create-template` (create)
 - **Auto-matching**: Phase 2.1 suggests installed templates first; Phase 2.2 can search BananaHub when local coverage is weak
 - **Adoption telemetry**: when a template is selected, call `python3 {baseDir}/scripts/bananahub.py telemetry track --event selected ...`; when template-driven `generate`/`edit` succeeds, pass template telemetry flags so the script can report `generate_success` / `edit_success`
-- **Install more**: prefer `discover` inside the skill, or run `npx bananahub add <user/repo>` directly when the install target is already known
+- **Install more**: prefer `discover` inside the skill; official rich templates install from `bananahub-ai/templates`, and known targets can still be installed with `npx bananahub add <user/repo[/template]>`
 - **Publishing rule**: when creating templates, save samples as `sample-{model-short}-{nn}.png` and make README list verified models, supported models, and sample-to-prompt mappings
 
 ## Safety Rules

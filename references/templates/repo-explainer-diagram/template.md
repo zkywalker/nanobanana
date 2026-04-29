@@ -1,21 +1,24 @@
 ---
 id: repo-explainer-diagram
 type: workflow
-title: 代码库讲解图工作流
-title_en: Repository Explainer Diagram Workflow
-description: 先读取 README、目录结构或代码摘要，再把代码库讲成一张结构清晰的信息图或架构讲解图。
+title: 代码库讲解图
+title_en: Repository Explainer Diagram
+description: 读取 README、目录结构或代码摘要后，生成一张准确的项目结构/流程讲解图。
 author: bananahub
 license: CC-BY-4.0
-version: 1.0.0
+version: 1.1.0
 profile: diagram
 tags: [代码库, 项目结构, 架构图, README, repo, codebase, architecture, explainer]
 models:
   - name: gemini-3-pro-image-preview
-    tested: true
+    tested: false
     quality: best
   - name: gemini-3.1-flash-image-preview
     tested: false
     quality: good
+  - name: gpt-image-2
+    tested: false
+    quality: best
 providers:
   - id: google-ai-studio
     family: gemini-image
@@ -32,10 +35,10 @@ providers:
     family: gpt-image
     models:
       - id: gpt-image-2
-        quality: untested
+        quality: best
         prompt_variant: gpt-image
       - id: gpt-image-1
-        quality: untested
+        quality: ok
         prompt_variant: gpt-image
 capabilities:
   generation: true
@@ -47,93 +50,72 @@ prompt_variants:
   gpt-image: prompt-gpt-image
 aspect: "4:3"
 difficulty: intermediate
-category: docs
-samples:
-  - file: samples/sample-3-pro-01.png
-    provider: google-ai-studio
-    prompt_variant: gemini
-    model: gemini-3-pro-image-preview
-    prompt: "Create a clean explainer diagram for BananaHub. Title: 'BananaHub Architecture'. Use a left-to-right architecture layout. Include these exact labeled blocks: 'BananaHub Skill', 'BananaHub CLI', 'Hub API', 'Catalog Site', 'GitHub Templates'. Show only these verified relationships: the skill loads built-in and installed templates, the CLI installs templates from GitHub, the Hub API reports discovered installs, and the catalog site indexes curated and discovered templates. Keep labels short, high-contrast, and easy to read. Use a modern flat product-doc aesthetic with restrained blue, teal, and warm gray accents. Prioritize clarity over decoration."
-    aspect: "4:3"
-  - file: samples/sample-3-pro-02.png
-    provider: google-ai-studio
-    model: gemini-3-pro-image-preview
-    prompt_variant: gemini
-    prompt: "Create a clean repository explainer diagram for BananaHub. Title: 'BananaHub Template Flow'. Use a top-to-bottom workflow layout. Include these exact labeled blocks: 'User Request', 'Prompt Optimization', 'Profile Match', 'Template Suggestion', 'Generate or Edit'. Show only these verified relationships: the user request goes into prompt optimization, optimization leads to profile matching, profile matching can trigger template suggestion, and the final step is generate or edit. Keep labels short, high-contrast, and easy to read. Use a crisp flat explainer-card aesthetic with soft grid background, restrained teal and banana-gold accents, and simple directional connectors."
-    aspect: "4:3"
+category: developer
+samples: []
 created: 2026-03-31
-updated: 2026-03-31
+updated: 2026-04-29
 ---
 
 ## Goal
 
-Guide the agent through turning repository context into one clear explainer visual: a project map, architecture diagram, workflow chart, or onboarding card that reflects the actual repo structure instead of inventing generic boxes.
+Turn real repository context into one clear visual: project map, architecture diagram, request flow, setup flow, or contributor onboarding card. Accuracy beats decoration.
 
 ## When To Use
 
-- A repo needs a quick visual introduction for onboarding
-- README text is correct but too long for a first-pass explanation
-- A project owner wants one image for docs, slides, or social sharing
-- The user has local files, directory trees, or notes that should shape the diagram
-- Accuracy of labels and module relationships matters more than flashy illustration
+- A README needs a first-glance project overview
+- A new contributor needs to understand modules and data flow quickly
+- A technical article or launch post needs one repo-aware diagram
+- The user can provide local files, directory tree, README excerpts, or a source summary
 
 ## Inputs
 
 | Input | Required | Description |
 |-------|----------|-------------|
-| `source_material` | recommended | README sections, local file paths, copied notes, or a directory summary that the agent can read first |
-| `diagram_goal` | recommended | What the image should explain: architecture, request flow, setup steps, module map, data flow |
-| `audience` | optional | New contributors, PMs, customers, internal team, open-source visitors |
-| `copy_lock` | optional | Exact labels, titles, or bilingual text that must appear verbatim |
-| `style_lock` | optional | Flat vector, notebook sketch, product docs aesthetic, whiteboard note, and so on |
-| `layout_preference` | optional | Flowchart, layered architecture, left-to-right pipeline, hub-and-spoke, grid |
-| `stop_condition` | optional | One clear explainer card, one architecture diagram, or one reusable onboarding visual |
+| `source_material` | required | README excerpt, directory summary, code notes, or files the agent can inspect |
+| `diagram_goal` | recommended | Architecture, request flow, setup flow, module map, or data flow |
+| `audience` | optional | Contributors, maintainers, users, PMs, customers |
+| `locked_blocks` | optional | Exact module/step labels that must appear |
+| `style_lock` | optional | Product-doc, whiteboard, technical slide, or brand style |
 
 ## Steps
 
-1. Read the available source material before prompting Gemini. If the repo context is broad, compress it into 3 to 7 blocks and name each block in plain language.
-2. Decide the visual task first: architecture diagram, setup flow, repo map, or concept card. Do not mix multiple diagram goals in the same image unless the user explicitly asks for it.
-3. Lock all exact labels before generation. If a title, section name, or step label matters, keep it verbatim and wrap it in quotes in the final prompt.
-4. Choose one layout that matches the reading order. Prefer left-to-right for pipelines, top-to-bottom for setup flows, and grouped regions for repo maps.
-5. Generate the first version with short labels, clear connectors, and restrained styling. Do not overload the first image with every implementation detail.
-6. Review the output in this order: label accuracy, structural accuracy, reading order, then visual polish. If the diagram is pretty but structurally wrong, regenerate from the source summary.
-7. If text rendering drifts, shorten labels instead of adding more microcopy. If one module is ambiguous, clarify the label outside the image and rerun.
-8. Stop once the image communicates the repo's shape at a glance. This workflow is for explanation, not exhaustive documentation.
+1. Read the available repo context first. Compress it into 3–7 verified blocks and relationships.
+2. Pick one diagram goal. Do not mix architecture, setup, roadmap, and marketing copy in the same image.
+3. Lock exact labels before generation. Prefer short module names over full implementation details.
+4. Choose one layout: left-to-right pipeline, layered architecture, hub-and-spoke, grouped repo map, or top-to-bottom setup flow.
+5. Generate with the provider-specific block. Review label accuracy and relationship accuracy before visual polish.
+6. If the model invents modules, regenerate from a smaller source summary with a stricter label list.
 
 ## Prompt Blocks
 
-### Diagram Planning Prompt
+### Planning Prompt
 
 ```text
-Plan one concise repository explainer diagram for {{project_name|this project}}. The diagram should explain {{diagram_goal|the main architecture and data flow}} for {{audience|new contributors}}. Use only the following verified source summary as truth: {{source_summary|three to six short blocks describing the repo}}. Propose one clean layout, one title, and short exact labels for each block. Avoid inventing modules that are not in the source summary.
+Plan one concise repository explainer diagram for {{project_name|this project}}. Use only this verified source summary: {{source_summary|three to seven bullets from README, directory tree, or code notes}}. Return one diagram goal, one title, 3 to 7 exact block labels, and the verified relationships between them. Do not invent modules.
 ```
 
-### Diagram Generation Prompt
+### Generation Prompt: gemini
 
 ```text
-Create a clean explainer diagram for {{project_name|this project}}. Title: "{{title|Project Architecture Overview}}". Use a {{layout_preference|left-to-right architecture layout}}. Include these exact labeled blocks: {{locked_blocks| "Client", "API", "Worker", "Storage" }}. Show only the verified relationships from the source summary: {{source_summary|client sends requests to API, API triggers worker, worker reads and writes storage}}. Keep labels short, high-contrast, and easy to read. Use {{style_lock|a modern flat product-doc aesthetic with restrained colors and simple connectors}}. Prioritize clarity over decoration.
+Create a clean repository explainer diagram for {{project_name|this project}}. Title: "{{title|Project Architecture Overview}}". Use {{layout|a left-to-right architecture layout}}. Include only these exact labeled blocks: {{locked_blocks|"Client", "API", "Worker", "Storage"}}. Show only these verified relationships: {{relationships|Client sends requests to API; API triggers Worker; Worker reads and writes Storage}}. Use {{style_lock|a modern product-doc diagram style with restrained colors, simple connectors, and generous spacing}}. Keep labels short, high-contrast, and easy to read.
 ```
 
-### Layout Repair Prompt
+### Generation Prompt: gpt-image
 
 ```text
-Keep the same diagram topic and the same exact labels. Repair only the structure and readability. Strengthen the reading order, prevent label overlap, increase contrast, and make the connectors unambiguous. Do not add new modules or extra copy.
+Design one repository explainer diagram for {{project_name|this project}}. Title text: "{{title|Project Architecture Overview}}". Layout: {{layout|left-to-right architecture diagram}}. The only block labels allowed are: {{locked_blocks|"Client", "API", "Worker", "Storage"}}. Draw only these relationships: {{relationships|Client -> API; API -> Worker; Worker -> Storage}}. Style: {{style_lock|modern product-doc diagram, restrained colors, simple connectors, generous spacing}}. Do not add extra modules, paragraphs, fake file names, decorative code, watermarks, or tiny text.
 ```
 
-## Provider Prompt Rules
+### Repair Prompt
 
-### Provider Variant: gemini
-
-Use the prompt blocks above as written for Gemini/Nano Banana. Keep descriptive scene language, exact labels, and locked invariants explicit. Avoid generic SD/MJ quality tags.
-
-### Provider Variant: gpt-image
-
-Use the same workflow steps, but rewrite each generation prompt with explicit constraints, exact text limits, and negative constraints for extra labels, duplicated parts, clutter, and cropped edges. Do not use a Gemini-tuned prompt block directly with GPT Image unless this workflow step has been tested with GPT Image.
+```text
+Keep the same title, blocks, and relationships. Repair label accuracy, connector direction, spacing, and readability only. Remove any invented module or extra label.
+```
 
 ## Success Checks
 
-- Every major block in the image maps back to real source material
-- The diagram has one obvious reading order without verbal explanation
-- Labels are short enough to render cleanly and stay accurate
-- The visual can be understood by the target audience in under ten seconds
-- A reviewer can point to one or two omissions, not a full structural rewrite
+- Every block maps to real source material
+- The diagram has one obvious reading order
+- Labels are short, readable, and not invented
+- The image explains the repo faster than the README intro
+- Omissions are acceptable; structural hallucinations are not

@@ -212,7 +212,10 @@ def main():
     for template in iter_templates(paths):
         checked += 1
         errors, warnings = validate_template(template, providers, models)
-        rel = template.relative_to(ROOT)
+        try:
+            rel = template.resolve().relative_to(ROOT)
+        except ValueError:
+            rel = template
         for warning in warnings:
             print(f"WARN {rel}: {warning}")
         for error in errors:

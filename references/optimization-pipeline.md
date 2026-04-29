@@ -133,10 +133,10 @@ After profile matching, check if any installed template closely matches the user
 3. **Score**: count keyword overlaps; threshold ≥ 2 tag matches to suggest
 4. **Default mode** — if a match is found:
    ```
-   Matching template found: cyberpunk-city (Cyberpunk City Nightscape)
+   Matching template found: info-diagram (Practical Infographic One-Pager)
    Fit: ⭐⭐⭐ (3 keyword hits)
    Recommended model: gpt-image-2
-   Why: generation-led visual task with strong first-pass fidelity requirements
+   Why: exact-label infographic task with strong first-pass fidelity requirements
 
    Choose:
    1. Use template

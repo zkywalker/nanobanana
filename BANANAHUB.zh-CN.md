@@ -106,7 +106,7 @@ CLI 每次 `add` 成功都会往 Hub 发一条：
 
 ```text
 POST https://worker.bananahub.ai/api/installs
-{ "repo": "user/repo", "template_id": "cyberpunk-city", "cli_version": "0.1.0" }
+{ "repo": "user/repo", "template_id": "info-diagram", "cli_version": "0.1.0" }
 ```
 
 后端是 Cloudflare Worker + KV（免费额度够用：100K reads/day、1K writes/day）。
@@ -125,7 +125,7 @@ GET /api/trending → [{ "repo": "...", "installs_7d": 15 }, ...]
 
 ```text
 POST https://worker.bananahub.ai/api/usage
-{ "repo": "bananahub-ai/bananahub-skill", "template_id": "cute-sticker", "event": "generate_success", "anonymous_id": "..." }
+{ "repo": "bananahub-ai/bananahub-skill", "template_id": "background-replace-edit", "event": "generate_success", "anonymous_id": "..." }
 ```
 
 事件类型只有三种：
@@ -137,7 +137,7 @@ POST https://worker.bananahub.ai/api/usage
 Hub 侧读：
 
 ```text
-GET /api/usage-stats?repo=bananahub-ai/bananahub-skill&template_id=cute-sticker
+GET /api/usage-stats?repo=bananahub-ai/bananahub-skill&template_id=background-replace-edit
 ```
 
 ---
@@ -177,9 +177,10 @@ GET /api/usage-stats?repo=bananahub-ai/bananahub-skill&template_id=cute-sticker
 ```json
 {
   "repos": [
-    "user-a/bananahub-cyberpunk",
-    "user-b/bananahub-templates",
-    "bananahub-ai/bananahub-skill"
+    "bananahub-ai/bananahub-skill",
+    "bananahub-ai/templates",
+    "user-a/bananahub-infographics",
+    "user-b/bananahub-templates"
   ]
 }
 ```
@@ -191,18 +192,18 @@ GET /api/usage-stats?repo=bananahub-ai/bananahub-skill&template_id=cute-sticker
   "generated_at": "2026-03-24T00:00:00Z",
   "templates": [
     {
-      "id": "cyberpunk-city",
-      "title": "赛博朋克城市夜景",
-      "title_en": "Cyberpunk City Nightscape",
-      "description": "一键生成赛博朋克风格的城市夜景",
+      "id": "info-diagram",
+      "title": "信息图一页卡",
+      "title_en": "Practical Infographic One-Pager",
+      "description": "把步骤、对比或框架压缩成一张清晰信息图",
       "author": "user-a",
-      "repo": "user-a/bananahub-cyberpunk",
-      "profile": "photo",
-      "tags": ["赛博朋克", "城市", "夜景"],
+      "repo": "user-a/bananahub-infographics",
+      "profile": "diagram",
+      "tags": ["信息图", "流程图", "one-pager"],
       "difficulty": "beginner",
       "models": [{ "name": "gemini-3-pro-image-preview", "quality": "best" }],
       "samples": [{
-        "url": "https://raw.githubusercontent.com/user-a/bananahub-cyberpunk/main/samples/sample-01.jpg",
+        "url": "https://raw.githubusercontent.com/user-a/bananahub-infographics/main/samples/sample-01.jpg",
         "model": "gemini-3-pro-image-preview",
         "prompt": "Cyberpunk city street at night..."
       }],
@@ -232,11 +233,11 @@ GET /api/usage-stats?repo=bananahub-ai/bananahub-skill&template_id=cute-sticker
 ┌─────────────────────────────┐
 │  [sample-01.jpg preview]    │
 │                             │
-│  赛博朋克城市夜景            │
-│  Cyberpunk City Nightscape  │
+│  信息图一页卡            │
+│  Practical Infographic One-Pager  │
 │                             │
-│  📷 photo  ⭐ beginner      │
-│  🏷️ 赛博朋克 城市 夜景      │
+│  📊 diagram  ⭐ beginner      │
+│  🏷️ 信息图 流程图 one-pager      │
 │                             │
 │  by user-a  📥 42 installs  │
 │  Models: Pro ✅ Flash ✅     │

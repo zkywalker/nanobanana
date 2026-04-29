@@ -9,17 +9,17 @@ Templates support progressive disclosure: they can be auto-suggested when contex
 
 ## Template Search Paths
 
-Templates are loaded from two locations (merged). On ID conflict, user-installed wins:
+Templates are activated from local installed paths (merged). On ID conflict, user-installed wins:
 
 1. **Built-in** (shipped with skill): `{baseDir}/references/templates/`
 2. **User-installed** (via `npx bananahub add`): `~/.config/bananahub/templates/`
 
-Each path contains template directories and an auto-generated `.registry.json` index.
+Each path contains template directories and an auto-generated `.registry.json` index. Rich official templates live in the remote `bananahub-ai/templates` repository and become local only after `discover` + install.
 
 ## Discovery Surfaces
 
 - `templates`, `templates <name>`, `use`, and Phase 2.1 auto-matching operate on **installed** templates
-- `discover ...` operates on the **remote BananaHub catalog** and should follow `references/hub-discovery.md`
+- `discover ...` operates on the **remote BananaHub catalog**, including the official `bananahub-ai/templates` library, and should follow `references/hub-discovery.md`
 
 Remote discovery should stay frontmatter-first. Do not load a remote template body until the user chooses a candidate or the shortlist is genuinely ambiguous.
 
@@ -43,9 +43,9 @@ Required fields for listing and auto-matching:
 
 | Field | Purpose | Example |
 |-------|---------|---------|
-| `id` | Unique identifier (lowercase, hyphens, 3-50 chars) | `cyberpunk-city` |
+| `id` | Unique identifier (lowercase, hyphens, 3-50 chars) | `article-one-page-summary` |
 | `type` | Template kind: `prompt` or `workflow` | `workflow` |
-| `title` | Chinese display title for listing | `角色一致性分镜工作流` |
+| `title` | Chinese display title for listing | `文章一图流解读` |
 | `title_en` | English display title | `Consistent Character Storyboard Workflow` |
 | `author` | GitHub username | `bananahub-ai` |
 | `version` | Semver | `1.0.0` |
@@ -132,11 +132,13 @@ Example:
 ```text
 Available templates (N)
 
-Photo (photo)
-  cyberpunk-city                  [prompt]    ⭐ beginner
+Product (product)
+  product-white-bg                [prompt]    ⭐ beginner
 
-General workflows (general)
-  consistent-character-storyboard [workflow]  ⭐⭐ intermediate
+Diagram (diagram)
+  info-diagram                    [prompt]    ⭐ beginner
+  article-one-page-summary        [workflow]  ⭐⭐ intermediate
+  repo-explainer-diagram          [workflow]  ⭐⭐ intermediate
 
 Usage: /bananahub templates <name>              Show details
        /bananahub use <name> [custom description]  Activate template

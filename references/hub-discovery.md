@@ -8,17 +8,17 @@ Use this file when:
 
 ## Discovery Surfaces
 
-- **Local installed templates**: handled by `templates`, `use`, and Phase 2.1 in `references/optimization-pipeline.md`
-- **Remote BananaHub catalog**: handled by `discover ...`
+- **Local installed templates**: built-in starter templates plus user-installed templates; handled by `templates`, `use`, and Phase 2.1 in `references/optimization-pipeline.md`
+- **Remote BananaHub catalog**: built-in starter metadata, the official `bananahub-ai/templates` library, and community/discovered templates; handled by `discover ...`
 
-Keep these surfaces separate. Do not silently replace a good local match with a remote template search.
+Keep these surfaces separate. Do not silently replace a good local match with a remote template search. Use remote official templates when the user asks for richer workflows, style packs, logo systems, character workflows, or sample-backed templates beyond the starter pack.
 
 ## Source Order
 
 Use BananaHub's machine-readable files instead of scraping the visual homepage:
 
 1. Read `https://bananahub.ai/llms.txt` if you have not used BananaHub yet in the current conversation or if you need the latest entry-point guidance
-2. Default to `https://bananahub.ai/catalog-curated.json` for safer recommendations
+2. Default to `https://bananahub.ai/catalog-curated.json` for safer recommendations; this includes bundled starter templates and installable official templates from `bananahub-ai/templates`
 3. Use `https://bananahub.ai/catalog.json` when:
    - the user asks for more options or community templates
    - curated results are weak
@@ -56,8 +56,8 @@ Rank candidates in this order:
 2. `pinned`
 3. `featured`
 4. `catalog_source: curated`
-5. `distribution: remote` when the user explicitly asked BananaHub to find something beyond the local starter set
-6. `official`
+5. `official`
+6. `distribution: remote` when the user explicitly asked BananaHub to find something beyond the local starter set
 7. Stronger workflow fit when the user clearly needs a multi-step SOP
 
 Keep the shortlist small. The goal is to reduce choice overload, not recreate the full gallery inside chat.
@@ -79,14 +79,15 @@ Remote discovery should stay lightweight:
 After recommending candidates:
 
 1. If the best match has `distribution: bundled`, say it is already built into BananaHub Skill and continue with `use <template-id>`
-2. Otherwise ask once whether to install the best match, inspect another shortlisted option, or continue without a template
-3. If the user clearly says to install or directly use the best remote match, run the `install_cmd`
-4. When the user commits to a candidate, record the selection with:
+2. If the best match has `distribution: remote` and `official: true`, say it comes from the official BananaHub template library and can be installed on demand
+3. Otherwise ask once whether to install the best match, inspect another shortlisted option, or continue without a template
+4. If the user clearly says to install or directly use the best remote match, run the `install_cmd`
+5. When the user commits to a candidate, record the selection with:
    `python3 {baseDir}/scripts/bananahub.py telemetry track --event selected --template-id <id> --template-repo <repo> --template-distribution bundled|remote --template-source curated|discovered --command-name use`
-5. After installation, switch immediately into local activation:
+6. After installation, switch immediately into local activation:
    - prompt template → continue with `use <template-id>`
    - workflow template → continue with `use <template-id>` and guide step-by-step
-6. Do not stop after installation unless the user explicitly wants to review first
+7. Do not stop after installation unless the user explicitly wants to review first
 
 ## Default Presentation Format
 
@@ -95,14 +96,14 @@ Keep remote suggestions compact:
 ```text
 BananaHub candidate templates
 1. app-web-logo-system [workflow]
-   Match: logo / brand / app icon
-   Source: curated, bundled, official
-   Use: /bananahub use app-web-logo-system
+   Match: logo / app icon / brand system
+   Source: curated, remote, official (bananahub-ai/templates)
+   Install: bananahub add bananahub-ai/templates/app-web-logo-system
 
-2. readme-launch-visual [workflow]
-   Match: launch / hero / banner
+2. info-diagram [prompt]
+   Match: flowchart / knowledge card / exact labels
    Source: curated, bundled, official
-   Use: /bananahub use readme-launch-visual
+   Use: /bananahub use info-diagram
 ```
 
 Then ask for one decision, not a long questionnaire.

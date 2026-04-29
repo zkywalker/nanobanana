@@ -45,11 +45,10 @@ For CLI checks, use `BANANAHUB_HOST_IMAGEGEN=1` or `check-mode --host-imagegen` 
 
 ## Best Fit
 
-- **Content and marketing**: campaign visuals, social images, covers, README launch art.
-- **Product and ecommerce**: white-background product shots, lifestyle scenes, feature boards, packaging directions.
-- **Knowledge visuals**: infographics, architecture diagrams, repository explainers, article illustration plans.
-- **IP and assets**: stickers, avatars, character-consistency storyboards, style-consistent asset packs.
-- **Team workflows**: keep prompts, samples, and templates reusable instead of burying them in one-off chats.
+- **Everyday visual work**: product clean shots, background replacement, article one-pagers, infographics, and repo explainers.
+- **Knowledge visuals**: turn processes, long-form content, or codebase context into readable one-image summaries.
+- **Provider-aware teams**: use the same template IDs across Gemini / Nano Banana and OpenAI GPT Image without hiding model-specific limits.
+- **Reusable workflows**: archive prompts and install richer templates from BananaHub instead of bloating the skill package.
 
 ## Commands
 
@@ -162,21 +161,21 @@ This layer is cross-model. Provider-dependent features such as mask edit, exact 
 
 Templates come in two shapes:
 
-- **Prompt templates** assemble one reusable prompt, such as product shots, stickers, or cyberpunk scenes.
-- **Workflow templates** guide multi-step jobs, such as character-consistency storyboards, repository explainer diagrams, or article illustration planning.
+- **Prompt templates** assemble one reusable prompt for stable jobs such as product clean shots, infographic cards, or background replacement edits.
+- **Workflow templates** guide multi-step jobs such as article one-page summaries or repository explainer diagrams.
 
 ```bash
 /bananahub templates
-/bananahub templates cyberpunk-city
-/bananahub use cyberpunk-city 东京新宿街头，紫色和金色霓虹
-/bananahub use consistent-character-storyboard
-/bananahub discover repository explainer diagram
+/bananahub templates article-one-page-summary
+/bananahub use info-diagram "PR review flow: Change, Review, Test, Fix, Merge"
+/bananahub use background-replace-edit --input product.png
+/bananahub discover logo system
 /bananahub create-template
 ```
 
-Built-ins include `cyberpunk-city`, `cute-sticker`, `product-white-bg`, `info-diagram`, `minimal-wallpaper`, `consistent-character-storyboard`, `repo-explainer-diagram`, `readme-launch-visual`, `article-illustration-workflow`, and `asset-style-consistency-pack`.
+Built-ins are a lean starter pack: `product-white-bg`, `info-diagram`, `article-one-page-summary`, `repo-explainer-diagram`, and `background-replace-edit`. They are practical, low-maintenance, sample-free, and support both Gemini/Nano Banana and OpenAI GPT Image through provider-specific prompt variants.
 
-User-installed templates live in `~/.config/bananahub/templates/` and take precedence over built-ins with the same ID.
+Install richer official templates from `bananahub-ai/templates` through BananaHub discovery when you need style packs, logo systems, character workflows, campaign visuals, or heavier sample galleries. Community templates remain available through the broader catalog. User-installed templates live in `~/.config/bananahub/templates/` and take precedence over built-ins with the same ID.
 
 ## References
 
@@ -195,9 +194,9 @@ User-installed templates live in `~/.config/bananahub/templates/` and take prece
 
 ## Contributing
 
-Code and docs contributions are accepted under MIT. Built-in templates and bundled sample assets under `references/templates/` should keep explicit template licensing and redistributable samples.
+Code and docs contributions are accepted under MIT. Built-in starter templates under `references/templates/` should stay lightweight and explicitly licensed; heavier sample galleries belong in official or community template repositories.
 
 ## License
 
 - Code, scripts, and general repo docs: MIT
-- Built-in templates and bundled sample assets under `references/templates/`: CC BY 4.0 unless a template directory states otherwise
+- Built-in starter templates under `references/templates/`: CC BY 4.0 unless a template directory states otherwise
