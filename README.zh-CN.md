@@ -141,6 +141,20 @@ python3 scripts/bananahub.py config set --provider chatgpt-compatible --base-url
 python3 scripts/bananahub.py config set --provider vertex-ai --auth-mode adc --project <gcp-project> --location global
 ```
 
+
+OpenAI-compatible `gpt-image-2` 网关手动验证：
+
+```bash
+BANANAHUB_PROFILE=gpt python3 scripts/bananahub.py generate \
+  "Create a cute sticker of a tiny cheerful robot holding a banana, rounded kawaii vector style, thick clean outlines, soft pastel colors, plain white background, no text." \
+  --model gpt-image-2 \
+  --aspect 1:1 \
+  --no-fallback \
+  --output /tmp/bananahub-gpt-image-2-test.png
+```
+
+命令应返回 `status: "ok"` 和 `actual_model: "gpt-image-2"`；telemetry 的 `HTTP 403` 警告不代表生图失败。
+
 配置来源优先级：`--config <file>` → 环境变量 → `~/.config/bananahub/config.json`。
 
 ## Prompt 优化怎么工作

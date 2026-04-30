@@ -141,6 +141,20 @@ python3 scripts/bananahub.py config set --provider chatgpt-compatible --base-url
 python3 scripts/bananahub.py config set --provider vertex-ai --auth-mode adc --project <gcp-project> --location global
 ```
 
+
+Manual validation for an OpenAI-compatible `gpt-image-2` gateway:
+
+```bash
+BANANAHUB_PROFILE=gpt python3 scripts/bananahub.py generate \
+  "Create a cute sticker of a tiny cheerful robot holding a banana, rounded kawaii vector style, thick clean outlines, soft pastel colors, plain white background, no text." \
+  --model gpt-image-2 \
+  --aspect 1:1 \
+  --no-fallback \
+  --output /tmp/bananahub-gpt-image-2-test.png
+```
+
+The command should return `status: "ok"` with `actual_model: "gpt-image-2"`; telemetry `HTTP 403` warnings do not indicate generation failure.
+
 Config priority: `--config <file>` → environment variables → `~/.config/bananahub/config.json`.
 
 ## How Prompt Optimization Works

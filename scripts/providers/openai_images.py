@@ -29,22 +29,31 @@ def build_generation_payload(
     background=None,
     output_format=None,
     output_compression=None,
+    provider=None,
 ):
+    is_openai_compatible = provider == "openai-compatible"
     payload = {
         "model": model,
         "prompt": prompt,
-        "response_format": "b64_json",
     }
+    if not is_openai_compatible:
+        payload["response_format"] = "b64_json"
     warnings = []
 
     if openai_size:
         payload["size"] = openai_size
+    elif is_openai_compatible:
+        payload["size"] = "auto"
     if quality:
         payload["quality"] = quality
+    elif is_openai_compatible:
+        payload["quality"] = "medium"
     if background:
         payload["background"] = background
     if output_format:
         payload["output_format"] = output_format
+    elif is_openai_compatible:
+        payload["output_format"] = "png"
     if output_compression is not None:
         payload["output_compression"] = output_compression
 
@@ -61,7 +70,7 @@ def build_generation_payload(
             warnings.append(
                 f"`--image-size {native_image_size}` is ignored for openai-compatible generation when aspect ratio is not 1:1."
             )
-        elif not openai_size:
+        elif not openai_size and not is_openai_compatible:
             payload["size"] = size_map[native_image_size]
 
     return payload, warnings
@@ -117,6 +126,7 @@ def list_models(config, resolve_endpoint, canonicalize_model, default_model, pro
 
 
 def try_generate(config, model, prompt, aspect_ratio, resolve_endpoint, image_size=None, openai_size=None, quality=None, background=None, output_format=None, output_compression=None, provider_openai="openai", default_provider="google-ai-studio"):
+    provider = config.get("BANANAHUB_PROVIDER", default_provider)
     payload, warnings = build_generation_payload(
         model,
         prompt,
@@ -127,6 +137,7 @@ def try_generate(config, model, prompt, aspect_ratio, resolve_endpoint, image_si
         background=background,
         output_format=output_format,
         output_compression=output_compression,
+        provider=provider,
     )
     endpoint_resolution = resolve_endpoint(provider_base_url(config))
     warnings = endpoint_resolution["warnings"] + warnings

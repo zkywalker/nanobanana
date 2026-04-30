@@ -96,6 +96,128 @@ def test_try_generate_posts_to_images_generations():
     assert calls[0]["timeout"] == 120
 
 
+def test_try_generate_openai_compatible_uses_gateway_safe_defaults():
+    calls = []
+    image_bytes = b"fake-png"
+    encoded = base64.b64encode(image_bytes).decode("ascii")
+
+    def fake_http_json_request(method, url, headers, payload=None, timeout=None):
+        calls.append(
+            {
+                "method": method,
+                "url": url,
+                "headers": headers,
+                "payload": payload,
+                "timeout": timeout,
+            }
+        )
+        return {"data": [{"b64_json": encoded}]}
+
+    original = openai_images.http_json_request
+    openai_images.http_json_request = fake_http_json_request
+    try:
+        result, warnings, error = openai_images.try_generate(
+            {
+                "BANANAHUB_PROVIDER": "openai-compatible",
+                "GEMINI_API_KEY": "test-key",
+                "OPENAI_BASE_URL": "https://token.bigfish.space/v1",
+            },
+            "gpt-image-2",
+            "Create a tiny cute robot sticker on a plain white background.",
+            "1:1",
+            openai_images.resolve_openai_endpoint_for_test,
+        )
+    finally:
+        openai_images.http_json_request = original
+
+    assert result == image_bytes
+    assert warnings == []
+    assert error is None
+    assert calls[0]["url"] == "https://token.bigfish.space/v1/images/generations"
+    assert calls[0]["headers"]["Authorization"] == "Bearer test-key"
+    assert calls[0]["payload"] == {
+        "model": "gpt-image-2",
+        "prompt": "Create a tiny cute robot sticker on a plain white background.",
+        "size": "auto",
+        "quality": "medium",
+        "output_format": "png",
+    }
+    assert "response_format" not in calls[0]["payload"]
+
+
+def test_try_generate_openai_compatible_preserves_explicit_size():
+    calls = []
+    image_bytes = b"fake-png"
+    encoded = base64.b64encode(image_bytes).decode("ascii")
+
+    def fake_http_json_request(method, url, headers, payload=None, timeout=None):
+        calls.append({"payload": payload})
+        return {"data": [{"b64_json": encoded}]}
+
+    original = openai_images.http_json_request
+    openai_images.http_json_request = fake_http_json_request
+    try:
+        result, warnings, error = openai_images.try_generate(
+            {
+                "BANANAHUB_PROVIDER": "openai-compatible",
+                "GEMINI_API_KEY": "test-key",
+                "OPENAI_BASE_URL": "https://token.bigfish.space/v1",
+            },
+            "gpt-image-2",
+            "Create a tiny cute robot sticker on a plain white background.",
+            "1:1",
+            openai_images.resolve_openai_endpoint_for_test,
+            openai_size="1024x1024",
+        )
+    finally:
+        openai_images.http_json_request = original
+
+    assert result == image_bytes
+    assert warnings == []
+    assert error is None
+    assert calls[0]["payload"]["size"] == "1024x1024"
+    assert calls[0]["payload"]["quality"] == "medium"
+    assert calls[0]["payload"]["output_format"] == "png"
+    assert "response_format" not in calls[0]["payload"]
+
+
+def test_try_generate_openai_compatible_preserves_explicit_quality_and_format():
+    calls = []
+    image_bytes = b"fake-png"
+    encoded = base64.b64encode(image_bytes).decode("ascii")
+
+    def fake_http_json_request(method, url, headers, payload=None, timeout=None):
+        calls.append({"payload": payload})
+        return {"data": [{"b64_json": encoded}]}
+
+    original = openai_images.http_json_request
+    openai_images.http_json_request = fake_http_json_request
+    try:
+        result, warnings, error = openai_images.try_generate(
+            {
+                "BANANAHUB_PROVIDER": "openai-compatible",
+                "GEMINI_API_KEY": "test-key",
+                "OPENAI_BASE_URL": "https://token.bigfish.space/v1",
+            },
+            "gpt-image-2",
+            "Create a tiny cute robot sticker on a plain white background.",
+            "1:1",
+            openai_images.resolve_openai_endpoint_for_test,
+            quality="high",
+            output_format="webp",
+        )
+    finally:
+        openai_images.http_json_request = original
+
+    assert result == image_bytes
+    assert warnings == []
+    assert error is None
+    assert calls[0]["payload"]["size"] == "auto"
+    assert calls[0]["payload"]["quality"] == "high"
+    assert calls[0]["payload"]["output_format"] == "webp"
+    assert "response_format" not in calls[0]["payload"]
+
+
 def test_try_edit_posts_multipart_with_mask_and_refs():
     calls = []
     image_bytes = b"edited"
@@ -158,5 +280,8 @@ if __name__ == "__main__":
     test_build_generation_payload_maps_image_size_and_options()
     test_build_generation_payload_prefers_explicit_openai_size()
     test_try_generate_posts_to_images_generations()
+    test_try_generate_openai_compatible_uses_gateway_safe_defaults()
+    test_try_generate_openai_compatible_preserves_explicit_size()
+    test_try_generate_openai_compatible_preserves_explicit_quality_and_format()
     test_try_edit_posts_multipart_with_mask_and_refs()
     print("ok")
