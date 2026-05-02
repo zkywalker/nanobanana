@@ -150,7 +150,7 @@ BANANAHUB_PROFILE=gpt python3 scripts/bananahub.py generate \
   --model gpt-image-2 \
   --aspect 1:1 \
   --no-fallback \
-  --output /tmp/bananahub-gpt-image-2-test.png
+  --output /tmp/bananahub-gpt-image-2-retry-test.png
 ```
 
 命令应返回 `status: "ok"` 和 `actual_model: "gpt-image-2"`；telemetry 的 `HTTP 403` 警告不代表生图失败。

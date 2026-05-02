@@ -1256,6 +1256,35 @@ OPENAI_MODEL_FALLBACK_CHAIN = [
 
 # HTTP status codes that trigger fallback (server-side, not user's fault)
 FALLBACK_STATUS_CODES = {"500", "502", "503", "504", "UNAVAILABLE", "INTERNAL", "OVERLOADED"}
+TRANSIENT_NETWORK_ERROR_MARKERS = {
+    "REMOTE END CLOSED CONNECTION WITHOUT RESPONSE",
+    "REMOTEDISCONNECTED",
+    "CONNECTION RESET",
+    "CONNECTIONRESETERROR",
+    "CONNECTION ABORTED",
+    "CONNECTIONABORTEDERROR",
+    "CONNECTION REFUSED",
+    "BROKEN PIPE",
+    "TIMED OUT",
+    "TIMEOUT",
+    "TEMPORARILY UNAVAILABLE",
+}
+NON_RETRYABLE_ERROR_MARKERS = {
+    "HTTP 400",
+    "HTTP 401",
+    "HTTP 403",
+    "UNAUTHORIZED",
+    "FORBIDDEN",
+    "AUTHENTICATION",
+    "INVALID API KEY",
+    "INVALID_API_KEY",
+    "PERMISSION DENIED",
+    "CONTENT POLICY",
+    "POLICY VIOLATION",
+    "SAFETY",
+    "BLOCKED",
+    "MODERATION",
+}
 
 FALLBACK_MODELS = [
     {"id": "gemini-3-pro-image-preview", "display_name": "Gemini 3 Pro Image Preview", "default": True},
@@ -1387,9 +1416,13 @@ def _add_template_telemetry_flags(parser):
 
 
 def _is_server_error(exception):
-    """Check if an exception is a server-side error eligible for fallback."""
+    """Check if an exception is a transient server/network error eligible for retry or fallback."""
     msg = str(exception).upper()
-    return any(code in msg for code in FALLBACK_STATUS_CODES)
+    if any(marker in msg for marker in NON_RETRYABLE_ERROR_MARKERS):
+        return False
+    return any(code in msg for code in FALLBACK_STATUS_CODES) or any(
+        marker in msg for marker in TRANSIENT_NETWORK_ERROR_MARKERS
+    )
 
 
 def _fallback_chain_for_provider(provider):
@@ -2239,7 +2272,7 @@ def main():
     gen_parser.add_argument("--save-prompt", action="store_true", help=f"Save the final prompt under {DEFAULT_PROMPT_ARCHIVE_DIR}/")
     gen_parser.add_argument("--prompt-output", help="Save the final prompt to a file or directory")
     gen_parser.add_argument("--no-fallback", action="store_true", help="Disable automatic model fallback on server errors")
-    gen_parser.add_argument("--retries", type=int, default=1, help="Retry count per model on 503 before fallback (default: 1)")
+    gen_parser.add_argument("--retries", type=int, default=1, help="Retry count per model on transient server/network errors before fallback (default: 1)")
     gen_parser.add_argument("--dry-run", action="store_true", help="Resolve config/model/options without calling the provider")
     _add_template_telemetry_flags(gen_parser)
 
@@ -2258,7 +2291,7 @@ def main():
     edit_parser.add_argument("--save-prompt", action="store_true", help=f"Save the final prompt under {DEFAULT_PROMPT_ARCHIVE_DIR}/")
     edit_parser.add_argument("--prompt-output", help="Save the final prompt to a file or directory")
     edit_parser.add_argument("--no-fallback", action="store_true", help="Disable automatic model fallback on server errors")
-    edit_parser.add_argument("--retries", type=int, default=1, help="Retry count per model on 503 before fallback (default: 1)")
+    edit_parser.add_argument("--retries", type=int, default=1, help="Retry count per model on transient server/network errors before fallback (default: 1)")
     edit_parser.add_argument("--dry-run", action="store_true", help="Resolve config/model/options without calling the provider")
     _add_template_telemetry_flags(edit_parser)
 

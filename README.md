@@ -150,7 +150,7 @@ BANANAHUB_PROFILE=gpt python3 scripts/bananahub.py generate \
   --model gpt-image-2 \
   --aspect 1:1 \
   --no-fallback \
-  --output /tmp/bananahub-gpt-image-2-test.png
+  --output /tmp/bananahub-gpt-image-2-retry-test.png
 ```
 
 The command should return `status: "ok"` with `actual_model: "gpt-image-2"`; telemetry `HTTP 403` warnings do not indicate generation failure.
