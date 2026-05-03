@@ -118,27 +118,37 @@ BananaHub supports several provider routes. Advanced capabilities are not assume
 Setup examples:
 
 ```bash
-# Inspect active config and capabilities
-python3 scripts/bananahub.py config show
-python3 scripts/bananahub.py check-mode --pretty
+# Beginner-friendly interactive setup
+python3 scripts/bananahub.py init --wizard
+# Optionally repair missing Python packages too
+python3 scripts/bananahub.py init --wizard --install-deps
 
-# Google AI Studio / Gemini Developer API
-python3 scripts/bananahub.py config set --provider google-ai-studio --api-key <your_api_key>
+# Agent/script-readable diagnosis
+python3 scripts/bananahub.py config doctor --json
 
-# Gemini-compatible relay
-python3 scripts/bananahub.py config set --provider gemini-compatible --base-url https://your-gemini-endpoint --api-key <your_key>
+# Recommended GPT Image gateway profile
+python3 scripts/bananahub.py config quickset --provider openai-compatible --profile gpt --default-profile \
+  --base-url https://your-openai-compatible-endpoint --api-key <your_key> --model gpt-image-2
 
-# OpenAI GPT Image
-python3 scripts/bananahub.py config set --provider openai --api-key <your_openai_key> --model gpt-image-2
+# OpenAI official GPT Image profile
+python3 scripts/bananahub.py config quickset --provider openai --profile gpt --default-profile \
+  --api-key <your_openai_key> --model gpt-image-2
 
-# OpenAI-compatible gateway
-python3 scripts/bananahub.py config set --provider openai-compatible --base-url https://your-openai-compatible-endpoint --api-key <your_key>
+# Google AI Studio / Gemini Developer API profile
+python3 scripts/bananahub.py config quickset --provider google-ai-studio --profile nano --default-profile \
+  --api-key <your_api_key> --model gemini-3-pro-image-preview
+
+# Gemini-compatible relay profile
+python3 scripts/bananahub.py config quickset --provider gemini-compatible --profile nano --default-profile \
+  --base-url https://your-gemini-endpoint --api-key <your_key> --model gemini-3-pro-image-preview
 
 # Chat/completions-compatible image endpoint
-python3 scripts/bananahub.py config set --provider chatgpt-compatible --base-url https://your-chat-endpoint --api-key <your_key> --model gpt-5.4
+python3 scripts/bananahub.py config quickset --provider chatgpt-compatible --profile chat --default-profile \
+  --base-url https://your-chat-endpoint --api-key <your_key> --model gpt-5.4
 
-# Vertex AI
-python3 scripts/bananahub.py config set --provider vertex-ai --auth-mode adc --project <gcp-project> --location global
+# Vertex AI ADC profile
+python3 scripts/bananahub.py config quickset --provider vertex-ai --profile vertex --default-profile \
+  --auth-mode adc --project <gcp-project> --location global
 ```
 
 

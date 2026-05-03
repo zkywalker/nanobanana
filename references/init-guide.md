@@ -1,111 +1,113 @@
 # Initialization Flow
 
-When the user runs `init`, actively diagnose and fix issues — don't just report status.
+When the user runs `init`, make BananaHub usable with the least possible back-and-forth. Prefer local CLI commands over asking the user to paste secrets into chat.
 
-## Step 1: Run diagnostics
+## Agent Rules
 
-Run `python3 {baseDir}/scripts/bananahub.py init --skip-test` first (skip API test until basics are ready). Parse the JSON output.
-
-## Step 2: Fix missing dependencies automatically
-
-If `dependencies.ok` is false:
-- **Directly run** `python3 -m pip install --user google-genai pillow` to install them
-- Do not just tell the user to install — install for them
-- If install fails because the environment is externally managed, show the error and suggest using a virtual environment
-
-## Step 3: Fix missing config file
-
-If `config_source.ok` is false (no config found anywhere):
-1. Ask the user **which access path they want**:
-   - **Recommended**: Google AI Studio / Gemini Developer API
-   - **Alternative**: Gemini-compatible relay / proxy (`base_url + key`)
-   - **OpenAI-style endpoint**: OpenAI-compatible (`base_url + key`)
-   - **Enterprise**: Vertex AI (`project + location + ADC` or Vertex API key)
-2. If they choose **Google AI Studio**:
-   - Ask for their Google AI Studio key
-   - Key management URL: https://aistudio.google.com/apikey
-   - Pricing note: usage may be free or paid depending on Google's current pricing/quota policy, the selected model, and the user's account/region
-   - Persist it with:
-     ```bash
-     python3 {baseDir}/scripts/bananahub.py config set --provider google-ai-studio --api-key "<user's key>"
-     ```
-3. If they choose a **Gemini-compatible relay / proxy**:
-   - Ask for both their proxy key and `base_url`
-   - If the vendor docs show a full endpoint ending in `/v1beta`, the user can paste it directly; BananaHub normalizes the trailing API version automatically
-   - Persist them with:
-     ```bash
-     python3 {baseDir}/scripts/bananahub.py config set --provider gemini-compatible --base-url "<relay base url>" --api-key "<user's key>"
-     ```
-4. If they choose an **OpenAI-compatible** endpoint:
-   - Ask for both their endpoint `base_url` and API key
-   - If they only have a bare host, BananaHub will try to append `/v1`; for Google's official OpenAI-compatible endpoint, it resolves to `/v1beta/openai`
-   - Persist them with:
-     ```bash
-     python3 {baseDir}/scripts/bananahub.py config set --provider openai-compatible --base-url "<openai-compatible base url>" --api-key "<user's key>"
-     ```
-   - Note: current runtime supports `generate`, `models`, and `init` healthcheck on this path, but not `edit`
-5. If they choose **Vertex AI**:
-   - Ask whether they want `adc` or `api_key`
-   - For `adc`, ask for `project` and `location`, then persist with:
-     ```bash
-     python3 {baseDir}/scripts/bananahub.py config set --provider vertex-ai --auth-mode adc --project "<gcp-project>" --location "<location>"
-     ```
-   - For `api_key`, persist with:
-     ```bash
-     python3 {baseDir}/scripts/bananahub.py config set --provider vertex-ai --auth-mode api_key --api-key "<vertex api key>"
-     ```
-6. Ask whether they want a default model pinned. If yes, run:
+1. Never ask the user to paste a real API key into the chat. Use the local wizard (`init --wizard`) or generate a shell command where the user fills `<api-key>` in their terminal.
+2. Start with machine-readable diagnosis:
    ```bash
-   python3 {baseDir}/scripts/bananahub.py config set --model "<model_id>"
+   python3 {baseDir}/scripts/bananahub.py config doctor --json
    ```
-7. If they later want to revert from relay/proxy mode back to Google's default endpoint, run:
+3. If the user is non-technical or unsure, run:
    ```bash
-   python3 {baseDir}/scripts/bananahub.py config set --clear-base-url
-   python3 {baseDir}/scripts/bananahub.py config set --provider google-ai-studio
+   python3 {baseDir}/scripts/bananahub.py init --wizard
+# or, to let BananaHub install missing Python packages first:
+python3 {baseDir}/scripts/bananahub.py init --wizard --install-deps
    ```
+4. If the user already knows their provider/base URL/model, use `config quickset` instead of walking them through manual JSON edits.
+5. Do not run a paid image-generation test unless the user explicitly agrees. Model-list healthchecks are okay; generation smoke tests require consent.
 
-## Step 4: Fix missing API key
+## Provider Selection
 
-If config source exists but `api_key.ok` is false:
-- A config file exists but `GEMINI_API_KEY` / `GOOGLE_API_KEY` / `api_key` is empty or missing
-- Ask the user which path they are using: `google-ai-studio`, `gemini-compatible`, `openai-compatible`, or `vertex-ai`
-- Then write/update the key via:
-  ```bash
-  python3 {baseDir}/scripts/bananahub.py config set --provider "<provider>" --api-key "<user's key>"
-  ```
-- If they are using `gemini-compatible` or `openai-compatible` and `base_url` is also missing, ask for it and persist it in the same command.
-- If they are using `vertex-ai` in `adc` mode, an API key is not required; instead check `project`, `location`, and ADC readiness.
+Ask one human question first: “Which image channel do you already have?”
 
-## Step 5: Run full diagnostics with API test
+- **OpenAI-compatible gateway** — Cherry Studio / Bigfish / other OpenAI-style image gateway. Default profile `gpt`, default model `gpt-image-2`.
+- **OpenAI official** — official GPT Image API. Default profile `gpt`, default model `gpt-image-2`.
+- **Google AI Studio** — Gemini / Nano Banana route. Default profile `nano`, default model `gemini-3-pro-image-preview`.
+- **Gemini-compatible gateway** — Gemini-style relay/proxy. Default profile `nano`.
+- **Vertex AI** — enterprise GCP route. Default profile `vertex`, usually `auth_mode=adc`.
+- **ChatGPT-compatible** — chat/completions endpoint that returns image URLs/base64 in assistant messages. Default profile `chat`.
 
-After dependencies and config are in place:
-- Run `python3 {baseDir}/scripts/bananahub.py init` (without --skip-test)
-- If API test passes → report success, environment is ready
-- If API test fails:
-  - **Auth error (401/403)**: API key is invalid — ask user to double-check and provide a new one
-  - **Network error**: base URL may be wrong, or proxy is down — show the current `provider` and `base_url` and ask user to verify
-  - **Other error**: show the error message and suggest the user check their configuration
+## One-Line Setup Commands
 
-## Step 6: Report final status
-
-Show a clear summary:
-```
-✅ 依赖: google-genai ✓, pillow ✓
-✅ 配置: [实际命中的配置源] ✓
-✅ Provider: google-ai-studio ✓
-✅ API Key: AIzaSy...xxxx ✓
-✅ 端点: https://... ✓
-✅ 连通性: API 响应正常 ✓
-
-🎉 环境已就绪，可以开始生图！试试: /bananahub 一只猫趴在键盘上
+OpenAI-compatible gateway:
+```bash
+python3 {baseDir}/scripts/bananahub.py config quickset --provider openai-compatible --profile gpt --default-profile \
+  --base-url "<openai-compatible base url>" --api-key "<api key>" --model gpt-image-2
 ```
 
-Or if issues remain:
+OpenAI official:
+```bash
+python3 {baseDir}/scripts/bananahub.py config quickset --provider openai --profile gpt --default-profile \
+  --api-key "<openai api key>" --model gpt-image-2
 ```
-✅ 依赖: google-genai ✓, pillow ✓
-✅ 配置: [实际命中的配置源] ✓
-✅ Provider: openai-compatible ✓
-❌ 连通性: [error message]
 
-请检查 provider、API Key 和端点地址是否正确。
+Google AI Studio:
+```bash
+python3 {baseDir}/scripts/bananahub.py config quickset --provider google-ai-studio --profile nano --default-profile \
+  --api-key "<google api key>" --model gemini-3-pro-image-preview
 ```
+
+Gemini-compatible gateway:
+```bash
+python3 {baseDir}/scripts/bananahub.py config quickset --provider gemini-compatible --profile nano --default-profile \
+  --base-url "<gemini-compatible base url>" --api-key "<api key>" --model gemini-3-pro-image-preview
+```
+
+Vertex AI ADC:
+```bash
+python3 {baseDir}/scripts/bananahub.py config quickset --provider vertex-ai --profile vertex --default-profile \
+  --auth-mode adc --project "<gcp-project>" --location global
+```
+
+ChatGPT-compatible endpoint:
+```bash
+python3 {baseDir}/scripts/bananahub.py config quickset --provider chatgpt-compatible --profile chat --default-profile \
+  --base-url "<chat endpoint>" --api-key "<api key>" --model gpt-5.4
+```
+
+## Diagnosis Contract
+
+`config doctor --json` returns fields agents should use directly:
+
+- `status`: `ok` or `needs_setup`
+- `provider` / `provider_label`
+- `effective_config`: masked key, base URL, model, endpoint resolution, capabilities
+- `missing_fields`: `api_key`, `base_url`, `project`, `location`, etc.
+- `missing_dependencies`: Python packages needed for the selected provider
+- `dependency_install_command`: safe local command for installing missing Python packages
+- `requires_user_secret`: true when the next step needs an API key
+- `safe_to_autofix`: fields the agent may fill without seeing a secret
+- `suggested_commands`: concrete next command(s)
+- `agent_notes`: safety and quota reminders
+
+## Validation Checklist
+
+After setup:
+
+```bash
+python3 {baseDir}/scripts/bananahub.py init --skip-test --json
+# optional dependency repair:
+python3 {baseDir}/scripts/bananahub.py init --skip-test --install-deps
+python3 {baseDir}/scripts/bananahub.py config show
+```
+
+If the user agrees to a provider call, run full init without `--skip-test`:
+
+```bash
+python3 {baseDir}/scripts/bananahub.py init --json
+```
+
+For OpenAI-compatible `gpt-image-2`, a generation smoke test is:
+
+```bash
+BANANAHUB_PROFILE=gpt python3 {baseDir}/scripts/bananahub.py generate \
+  "Create a cute sticker of a tiny cheerful robot holding a banana, rounded kawaii vector style, thick clean outlines, soft pastel colors, plain white background, no text." \
+  --model gpt-image-2 \
+  --aspect 1:1 \
+  --no-fallback \
+  --output /tmp/bananahub-gpt-image-2-retry-test.png
+```
+
+Expected result: `status: "ok"`, `actual_model: "gpt-image-2"`, and a readable PNG. Telemetry `HTTP 403` is non-blocking and should not be mixed with generation failure.

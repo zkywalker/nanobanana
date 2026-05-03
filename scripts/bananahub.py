@@ -2,9 +2,11 @@
 """BananaHub - provider-backed image generation CLI tool."""
 
 import argparse
+import getpass
 import json
 import os
 import re
+import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -610,11 +612,12 @@ def _build_openai_generation_payload(
 
 def _list_openai_models(config):
     """List models from an OpenAI-compatible endpoint."""
+    provider = config.get("BANANAHUB_PROVIDER", DEFAULT_PROVIDER)
     return openai_provider.list_models(
         config,
         resolve_endpoint=_resolve_openai_endpoint,
         canonicalize_model=_canonicalize_model,
-        default_model=DEFAULT_MODEL,
+        default_model=_provider_default_model(provider),
         provider_openai=PROVIDER_OPENAI,
         default_provider=DEFAULT_PROVIDER,
     )
@@ -686,36 +689,79 @@ def _provider_healthcheck(config):
     }
 
 
-def cmd_init(args):
-    """Check environment readiness and guide user through setup."""
-    checks = []
+def _dependency_status_for_provider(provider):
+    deps = {"pillow": "PIL"}
+    if provider in {PROVIDER_GOOGLE_AI_STUDIO, PROVIDER_GEMINI_COMPATIBLE, PROVIDER_VERTEX_AI}:
+        deps["google-genai"] = "google.genai"
+    status = {}
+    for pkg, import_name in deps.items():
+        try:
+            __import__(import_name)
+            status[pkg] = True
+        except ImportError:
+            status[pkg] = False
+    return status
 
-    # 1. Check config sources
-    config, resolved_from, config_sources, explicit_resolved_from = _load_merged_config(
-        config_file=getattr(args, "config", None)
-    )
+
+def _missing_dependency_packages(provider):
+    return [name for name, present in _dependency_status_for_provider(provider).items() if not present]
+
+
+def _dependency_install_command(packages):
+    return [sys.executable, "-m", "pip", "install", "--user", *packages]
+
+
+def _install_missing_dependencies(provider):
+    packages = _missing_dependency_packages(provider)
+    if not packages:
+        return {"installed": [], "skipped": True}
+    command = _dependency_install_command(packages)
+    subprocess.run(command, check=True)
+    return {"installed": packages, "command": command}
+
+
+def _maybe_install_dependencies(provider, force=False, interactive=False):
+    packages = _missing_dependency_packages(provider)
+    if not packages:
+        return {"installed": [], "skipped": True}
+    if not force:
+        if not interactive or not sys.stdin.isatty():
+            return {
+                "installed": [],
+                "skipped": True,
+                "missing": packages,
+                "command": " ".join(_dependency_install_command(packages)),
+            }
+        answer = input(f"Install missing Python package(s) now ({', '.join(packages)})? [Y/n]: ").strip().lower()
+        if answer in {"n", "no"}:
+            return {
+                "installed": [],
+                "skipped": True,
+                "missing": packages,
+                "command": " ".join(_dependency_install_command(packages)),
+            }
+    result = _install_missing_dependencies(provider)
+    return {**result, "missing": packages}
+
+
+def _build_init_checks(config, resolved_from, config_sources, explicit_resolved_from, skip_test=False):
+    checks = []
     actual_sources = _list_config_sources(config_sources, explicit_resolved_from)
 
-    if actual_sources:
-        checks.append({
-            "name": "config_source",
-            "ok": True,
-            "sources": actual_sources,
-            "preferred_path": str(SKILL_CONFIG_PATH),
-        })
-    else:
-        checks.append({
-            "name": "config_source",
-            "ok": False,
-            "error": f"No config found. Create {SKILL_CONFIG_PATH} or use environment variables.",
-        })
+    checks.append({
+        "name": "config_source",
+        "ok": bool(actual_sources),
+        "sources": actual_sources,
+        "preferred_path": str(SKILL_CONFIG_PATH),
+        **({} if actual_sources else {"error": f"No config found. Create {SKILL_CONFIG_PATH}, run init --wizard, or use environment variables."}),
+    })
 
-    # 2. Check provider resolution and runtime support
     runtime_support = _runtime_support_status(config)
     checks.append({
         "name": "provider",
         "ok": True,
         "value": config.get("BANANAHUB_PROVIDER"),
+        "label": _provider_display_name(runtime_support["provider"]),
         "transport": runtime_support["transport"],
         "auth_mode": runtime_support["auth_mode"],
         "source": resolved_from.get("BANANAHUB_PROVIDER"),
@@ -730,15 +776,9 @@ def cmd_init(args):
         "detail": runtime_support["reasons"] or ["ready"],
     })
 
-    # 3. Check API key
     api_key, api_key_name, api_key_type = _active_api_key(config, runtime_support)
     if runtime_support["auth_mode"] != AUTH_MODE_API_KEY:
-        checks.append({
-            "name": "api_key",
-            "ok": True,
-            "value": "(not required for current auth_mode)",
-            "source": resolved_from.get(api_key_name) if api_key_name else None,
-        })
+        checks.append({"name": "api_key", "ok": True, "value": "(not required for current auth_mode)", "source": None})
     elif api_key:
         checks.append({
             "name": "api_key",
@@ -754,151 +794,239 @@ def cmd_init(args):
             "ok": False,
             "config_key": api_key_name,
             "type": api_key_type,
-            "error": "API key not found in any config source for the selected provider.",
+            "error": "API key not found for the selected provider.",
         })
 
-    # 4. Check endpoint / base URL
-    if runtime_support["provider"] == PROVIDER_CHATGPT_COMPATIBLE:
-        base_url = config.get("BANANAHUB_CHATGPT_BASE_URL", "")
-        base_url_source = resolved_from.get("BANANAHUB_CHATGPT_BASE_URL")
-    elif runtime_support["provider"] == PROVIDER_OPENAI:
-        base_url = config.get("OPENAI_BASE_URL", "")
-        base_url_source = resolved_from.get("OPENAI_BASE_URL")
-    elif runtime_support["transport"] == TRANSPORT_OPENAI_REST:
-        base_url = config.get("OPENAI_BASE_URL") or config.get("GOOGLE_GEMINI_BASE_URL", "")
-        base_url_source = resolved_from.get("OPENAI_BASE_URL") or resolved_from.get("GOOGLE_GEMINI_BASE_URL")
+    effective = _serialize_effective_config(config)
+    base_url = effective.get("base_url")
+    if runtime_support["provider"] in {PROVIDER_GEMINI_COMPATIBLE, PROVIDER_OPENAI_COMPATIBLE, PROVIDER_CHATGPT_COMPATIBLE} and not base_url:
+        checks.append({"name": "base_url", "ok": False, "error": f"provider '{runtime_support['provider']}' requires a base_url."})
     else:
-        base_url = config.get("GOOGLE_GEMINI_BASE_URL", "")
-        base_url_source = resolved_from.get("GOOGLE_GEMINI_BASE_URL")
-
-    if runtime_support["provider"] == PROVIDER_GEMINI_COMPATIBLE and not base_url:
-        checks.append({
-            "name": "base_url",
-            "ok": False,
-            "error": "provider 'gemini-compatible' requires a base_url.",
-        })
-    elif runtime_support["provider"] == PROVIDER_OPENAI_COMPATIBLE and not base_url:
-        checks.append({
-            "name": "base_url",
-            "ok": False,
-            "error": "provider 'openai-compatible' requires a base_url.",
-        })
-    elif runtime_support["provider"] == PROVIDER_CHATGPT_COMPATIBLE and not base_url:
-        checks.append({
-            "name": "base_url",
-            "ok": False,
-            "error": "provider 'chatgpt-compatible' requires a chatgpt_base_url.",
-        })
-    elif base_url:
-        endpoint_resolution = (
-            _resolve_openai_endpoint(base_url)
-            if runtime_support["transport"] == TRANSPORT_OPENAI_REST
-            else _resolve_genai_endpoint(base_url)
-        )
         checks.append({
             "name": "base_url",
             "ok": True,
-            "value": base_url,
-            "source": base_url_source,
-            "mode": "custom_endpoint" if runtime_support["provider"] != PROVIDER_GOOGLE_AI_STUDIO else "override_endpoint",
-            "resolved_base_url": endpoint_resolution.get("resolved_base_url"),
-            "api_version": endpoint_resolution.get("api_version"),
-            "warnings": endpoint_resolution.get("warnings"),
+            "value": base_url or "(provider default endpoint)",
+            "mode": "custom_endpoint" if base_url else "provider_default",
+            "endpoint_resolution": effective.get("endpoint_resolution"),
         })
-    else:
-        checks.append({"name": "base_url", "ok": True, "value": "(provider default endpoint)", "mode": "provider_default"})
 
-    # 5. Show configured default model when present
     model = config.get("BANANAHUB_MODEL", "")
+    provider_default = _provider_default_model(runtime_support["provider"])
     checks.append({
         "name": "default_model",
         "ok": True,
-        "value": model or DEFAULT_MODEL,
-        "source": resolved_from.get("BANANAHUB_MODEL") if model else f"default:{DEFAULT_MODEL}",
+        "value": model or provider_default,
+        "source": resolved_from.get("BANANAHUB_MODEL") if model else f"default:{provider_default}",
     })
 
-    # 6. Check Python dependencies
-    deps = {}
-    for pkg, import_name in [("google-genai", "google.genai"), ("pillow", "PIL")]:
-        try:
-            __import__(import_name)
-            deps[pkg] = True
-        except ImportError:
-            deps[pkg] = False
+    deps = _dependency_status_for_provider(runtime_support["provider"])
     checks.append({"name": "dependencies", "ok": all(deps.values()), "detail": deps})
 
-    all_ok = all(c["ok"] for c in checks)
-
-    # 7. API connectivity test (only if basic checks pass)
-    if all_ok and not args.skip_test:
+    if all(c["ok"] for c in checks) and not skip_test:
         try:
             healthcheck = _provider_healthcheck(config)
             checks.append({"name": "api_test", "ok": True, **healthcheck})
-        except Exception as e:
-            checks.append({"name": "api_test", "ok": False, "error": str(e)[:200]})
+        except Exception as exc:
+            checks.append({"name": "api_test", "ok": False, "error": str(exc)[:200]})
+    return checks
 
-    all_ok = all(c["ok"] for c in checks)
 
-    setup_guide = None
-    if not all_ok:
-        setup_guide = {
-            "steps": [
-                "Option A (recommended): Google AI Studio / Gemini Developer API:",
-                "  1. Create or manage a key in Google AI Studio: https://aistudio.google.com/apikey",
-                "  2. python3 bananahub.py config set --provider google-ai-studio --api-key <your_api_key>",
-                "  3. Optional default model: python3 bananahub.py config set --model gemini-3.1-flash-image-preview",
-                f"  4. Review effective config: python3 bananahub.py config show",
-                "Option B: Gemini-compatible relay / proxy:",
-                "  1. python3 bananahub.py config set --provider gemini-compatible --base-url https://your-gemini-compatible-endpoint --api-key <your_proxy_key>",
-                "  2. Optional default model: python3 bananahub.py config set --model gemini-2.5-flash-image",
-                f"  3. Review effective config: python3 bananahub.py config show",
-                "Option C: OpenAI-compatible endpoint:",
-                "  1. python3 bananahub.py config set --provider openai-compatible --base-url https://your-openai-compatible-endpoint --api-key <your_api_key>",
-                "  2. Optional default model: python3 bananahub.py config set --model gemini-2.0-flash-preview-image-generation",
-                f"  3. Review effective config: python3 bananahub.py config show",
-                "Option D: Vertex AI:",
-                "  1. ADC mode: python3 bananahub.py config set --provider vertex-ai --auth-mode adc --project <gcp-project> --location global",
-                "  2. Express mode key: python3 bananahub.py config set --provider vertex-ai --auth-mode api_key --api-key <vertex_api_key>",
-                f"  3. Review effective config: python3 bananahub.py config show",
-                "Option E: Create BananaHub config manually:",
-                f"  1. mkdir -p {SKILL_CONFIG_DIR}",
-                f'  2. Create {SKILL_CONFIG_PATH} with:',
-                '     {"provider": "google-ai-studio", "api_key": "your_api_key_here", "model": "gemini-3-pro-image-preview"}',
-                "     or",
-                '     {"provider": "gemini-compatible", "api_key": "your_proxy_key_here", "base_url": "https://your-endpoint"}',
-                "     or",
-                '     {"provider": "openai-compatible", "api_key": "your_api_key_here", "base_url": "https://your-openai-endpoint"}',
-                "     or",
-                '     {"provider": "vertex-ai", "auth_mode": "adc", "project": "your-gcp-project", "location": "global"}',
-                "Option F: Use environment variables:",
-                "  export GOOGLE_API_KEY=your_api_key_here  # or GEMINI_API_KEY",
-                "  export BANANAHUB_PROVIDER=google-ai-studio",
-                "  export BANANAHUB_MODEL=gemini-3-pro-image-preview  # optional",
-                "  export BANANAHUB_PROVIDER=gemini-compatible        # for relay/proxy users",
-                "  export GOOGLE_GEMINI_BASE_URL=https://your-gemini-compatible-endpoint",
-                "  export BANANAHUB_PROVIDER=openai-compatible       # for OpenAI-style endpoints",
-                "  export BANANAHUB_PROVIDER=vertex-ai",
-                "  export BANANAHUB_AUTH_MODE=adc                     # or api_key",
-                "  export GOOGLE_CLOUD_PROJECT=your-gcp-project       # Vertex AI",
-                "  export GOOGLE_CLOUD_LOCATION=global                # Vertex AI",
-                "",
-                "OpenAI-native provider supports generate/edit/mask-edit through OpenAI image endpoints.",
-                "OpenAI-compatible endpoint capabilities are vendor-dependent; do not assume edit or mask-edit support.",
-                "Google pricing and quota policy may apply depending on model/account/region.",
-                "Install dependencies: pip install google-genai pillow",
-                f"Run again: python3 bananahub.py init",
-            ]
-        }
+def _init_setup_guide(diagnosis=None):
+    diagnosis = diagnosis or {}
+    return {
+        "summary": "Run the interactive wizard, or use one of these one-line setup commands.",
+        "recommended": "python3 scripts/bananahub.py init --wizard",
+        "commands": [
+            "python3 scripts/bananahub.py config quickset --provider openai-compatible --profile gpt --default-profile --base-url <openai-compatible-base-url> --api-key <api-key> --model gpt-image-2",
+            "python3 scripts/bananahub.py config quickset --provider openai --profile gpt --default-profile --api-key <openai-api-key> --model gpt-image-2",
+            "python3 scripts/bananahub.py config quickset --provider google-ai-studio --profile nano --default-profile --api-key <google-api-key> --model gemini-3-pro-image-preview",
+            "python3 scripts/bananahub.py config quickset --provider gemini-compatible --profile nano --default-profile --base-url <gemini-compatible-base-url> --api-key <api-key> --model gemini-3-pro-image-preview",
+            "python3 scripts/bananahub.py config quickset --provider vertex-ai --profile vertex --default-profile --auth-mode adc --project <gcp-project> --location global",
+        ],
+        "agent_notes": diagnosis.get("agent_notes") or [
+            "Ask which provider/channel the user already has before asking for credentials.",
+            "Do not ask the user to paste real API keys into chat; use the local wizard or a shell command.",
+        ],
+    }
 
-    print(json.dumps({
-        "status": "ok" if all_ok else "incomplete",
-        "checks": checks,
-        "setup_guide": setup_guide,
-    }, ensure_ascii=False, indent=2))
 
-    if not all_ok:
+def _prompt_choice(prompt, choices, default=None):
+    print(prompt)
+    for idx, (key, label) in enumerate(choices, 1):
+        suffix = " (default)" if key == default else ""
+        print(f"  {idx}. {label}{suffix}")
+    while True:
+        raw = input("Choose: ").strip()
+        if not raw and default:
+            return default
+        if raw.isdigit():
+            pos = int(raw) - 1
+            if 0 <= pos < len(choices):
+                return choices[pos][0]
+        for key, label in choices:
+            if raw.lower() in {key.lower(), label.lower()}:
+                return key
+        print("Please enter a number or provider id.")
+
+
+def _prompt_text(prompt, default=None, secret=False, required=False):
+    suffix = f" [{default}]" if default else ""
+    while True:
+        if secret:
+            value = getpass.getpass(f"{prompt}{suffix}: ")
+        else:
+            value = input(f"{prompt}{suffix}: ")
+        value = value.strip()
+        if not value and default is not None:
+            return default
+        if value or not required:
+            return value
+        print("This value is required.")
+
+
+def _run_init_wizard(args):
+    choices = [
+        (PROVIDER_OPENAI_COMPATIBLE, "OpenAI-compatible gateway, e.g. Cherry Studio / Bigfish"),
+        (PROVIDER_OPENAI, "OpenAI / GPT Image official API"),
+        (PROVIDER_GOOGLE_AI_STUDIO, "Google AI Studio / Gemini Developer API"),
+        (PROVIDER_GEMINI_COMPATIBLE, "Gemini-compatible gateway"),
+        (PROVIDER_VERTEX_AI, "Vertex AI"),
+        (PROVIDER_CHATGPT_COMPATIBLE, "ChatGPT-compatible image endpoint"),
+    ]
+    print("Welcome to BananaHub setup 🍌")
+    provider = _normalize_provider(args.provider) if getattr(args, "provider", None) else _prompt_choice(
+        "Which image provider do you want to use?",
+        choices,
+        default=PROVIDER_OPENAI_COMPATIBLE,
+    )
+    auth_mode = getattr(args, "auth_mode", None) or AUTH_MODE_API_KEY
+    if provider == PROVIDER_VERTEX_AI and not getattr(args, "auth_mode", None):
+        auth_mode = _prompt_choice("Vertex AI auth mode?", [(AUTH_MODE_ADC, "Application Default Credentials"), (AUTH_MODE_API_KEY, "API key")], default=AUTH_MODE_ADC)
+
+    profile = getattr(args, "profile", None) or _default_profile_for_provider(provider)
+    base_url = getattr(args, "base_url", None)
+    api_key = getattr(args, "api_key", None)
+    project = getattr(args, "project", None)
+    location = getattr(args, "location", None)
+    model = getattr(args, "model", None) or _provider_default_model(provider)
+
+    if provider in {PROVIDER_OPENAI_COMPATIBLE, PROVIDER_GEMINI_COMPATIBLE, PROVIDER_CHATGPT_COMPATIBLE} and not base_url:
+        base_url = _prompt_text("Base URL", required=True)
+    if provider == PROVIDER_VERTEX_AI:
+        project = project or _prompt_text("Google Cloud project", required=True)
+        location = location or _prompt_text("Google Cloud location", default=DEFAULT_LOCATION, required=True)
+    if auth_mode == AUTH_MODE_API_KEY and not api_key:
+        api_key = _prompt_text("API key (hidden; stored locally)", secret=True, required=True)
+    if not getattr(args, "model", None):
+        model = _prompt_text("Default model", default=model, required=True)
+
+    persisted_config = _load_persisted_for_update_or_exit()
+    try:
+        target_config = _apply_config_updates(
+            persisted_config,
+            provider=provider,
+            api_key=api_key,
+            base_url=base_url,
+            model=model,
+            auth_mode=auth_mode,
+            project=project,
+            location=location,
+            profile=profile,
+            default_profile=profile,
+        )
+    except ValueError as exc:
+        print(json.dumps({"status": "error", "error": str(exc)}, ensure_ascii=False))
         sys.exit(1)
 
+    error = _validate_persisted_target_config(target_config)
+    if error:
+        print(json.dumps({"status": "error", "error": error}, ensure_ascii=False))
+        sys.exit(1)
+    try:
+        _write_persisted_config_secure(persisted_config)
+    except OSError as exc:
+        print(json.dumps({"status": "error", "error": f"Failed to write config: {exc}"}, ensure_ascii=False))
+        sys.exit(1)
+
+    print(f"✓ Saved profile: {profile}")
+    print(f"✓ Provider: {provider}")
+    print(f"✓ Default model: {model}")
+    print(f"✓ Config file: {SKILL_CONFIG_PATH}")
+
+    try:
+        dep_result = _maybe_install_dependencies(
+            provider,
+            force=getattr(args, "install_deps", False),
+            interactive=getattr(args, "wizard", False),
+        )
+        if dep_result.get("installed"):
+            print(f"✓ Installed dependencies: {', '.join(dep_result['installed'])}")
+        elif dep_result.get("missing"):
+            print(f"! Missing dependencies: {', '.join(dep_result['missing'])}")
+            print(f"  Install with: {dep_result['command']}")
+    except subprocess.CalledProcessError as exc:
+        print(f"! Dependency install failed: {exc}")
+
+    if not getattr(args, "skip_test", False):
+        effective_config = _apply_command_provider_override(load_config(getattr(args, "config", None)), None)
+        try:
+            healthcheck = _provider_healthcheck(effective_config)
+            print(f"✓ Healthcheck: {healthcheck['mode']} — {healthcheck['response']}")
+        except Exception as exc:
+            print(f"! Healthcheck failed: {str(exc)[:200]}")
+            print("  You can still inspect setup with: python3 scripts/bananahub.py config doctor")
+
+    print("Try:")
+    print(f"BANANAHUB_PROFILE={profile} python3 scripts/bananahub.py generate \"a cute banana robot sticker\" --model {model} --no-fallback")
+
+
+def cmd_init(args):
+    """Check environment readiness and guide user through setup."""
+    if getattr(args, "wizard", False) or getattr(args, "provider", None) or getattr(args, "api_key", None) or getattr(args, "base_url", None):
+        _run_init_wizard(args)
+        return
+
+    config, resolved_from, config_sources, explicit_resolved_from = _load_merged_config(
+        config_file=getattr(args, "config", None)
+    )
+    if getattr(args, "install_deps", False):
+        try:
+            dep_result = _install_missing_dependencies(_runtime_support_status(config)["provider"])
+        except subprocess.CalledProcessError as exc:
+            print(json.dumps({"status": "error", "error": f"Dependency install failed: {exc}"}, ensure_ascii=False))
+            sys.exit(1)
+        if dep_result.get("installed") and not getattr(args, "json", False):
+            print("Installed dependencies: " + ", ".join(dep_result["installed"]))
+    checks = _build_init_checks(
+        config,
+        resolved_from,
+        config_sources,
+        explicit_resolved_from,
+        skip_test=getattr(args, "skip_test", False),
+    )
+    all_ok = all(c["ok"] for c in checks)
+    diagnosis = _diagnose_config_state(config, resolved_from, config_sources, explicit_resolved_from, args=args)
+    response = {
+        "status": "ok" if all_ok else "incomplete",
+        "checks": checks,
+        "diagnosis": diagnosis,
+        "setup_guide": None if all_ok else _init_setup_guide(diagnosis),
+    }
+    if getattr(args, "json", False):
+        print(json.dumps(response, ensure_ascii=False, indent=2))
+    else:
+        print(f"BananaHub init: {response['status']}")
+        for check in checks:
+            mark = "✓" if check["ok"] else "✗"
+            detail = check.get("value") or check.get("error") or check.get("detail") or ""
+            print(f"{mark} {check['name']}: {detail}")
+        if not all_ok:
+            print("\nNext step:")
+            print(response["setup_guide"]["recommended"])
+            print("Or run:")
+            print(response["diagnosis"]["suggested_commands"][0])
+    if not all_ok:
+        sys.exit(1)
 
 def cmd_config_show(args):
     """Show effective and persisted config state."""
@@ -930,6 +1058,231 @@ def cmd_config_show(args):
     print(json.dumps(response, ensure_ascii=False, indent=2))
 
 
+def _provider_display_name(provider):
+    names = {
+        PROVIDER_GOOGLE_AI_STUDIO: "Google AI Studio / Gemini Developer API",
+        PROVIDER_OPENAI: "OpenAI / GPT Image official API",
+        PROVIDER_OPENAI_COMPATIBLE: "OpenAI-compatible gateway",
+        PROVIDER_GEMINI_COMPATIBLE: "Gemini-compatible gateway",
+        PROVIDER_VERTEX_AI: "Vertex AI",
+        PROVIDER_CHATGPT_COMPATIBLE: "ChatGPT-compatible image endpoint",
+    }
+    return names.get(provider, provider)
+
+
+def _default_profile_for_provider(provider):
+    defaults = {
+        PROVIDER_OPENAI: "gpt",
+        PROVIDER_OPENAI_COMPATIBLE: "gpt",
+        PROVIDER_CHATGPT_COMPATIBLE: "chat",
+        PROVIDER_GEMINI_COMPATIBLE: "nano",
+        PROVIDER_GOOGLE_AI_STUDIO: "nano",
+        PROVIDER_VERTEX_AI: "vertex",
+    }
+    return defaults.get(provider, provider.replace("-", "_"))
+
+
+def _provider_default_model(provider):
+    return DEFAULT_MODEL_BY_PROVIDER.get(provider, DEFAULT_MODEL)
+
+
+def _provider_required_fields(provider, auth_mode=AUTH_MODE_API_KEY):
+    if provider in {PROVIDER_GEMINI_COMPATIBLE, PROVIDER_OPENAI_COMPATIBLE, PROVIDER_CHATGPT_COMPATIBLE}:
+        fields = ["base_url"]
+    else:
+        fields = []
+    if provider == PROVIDER_VERTEX_AI:
+        fields.extend(["project", "location"])
+        if auth_mode == AUTH_MODE_API_KEY:
+            fields.append("api_key")
+    elif auth_mode == AUTH_MODE_API_KEY:
+        fields.append("api_key")
+    return fields
+
+
+def _target_config_for_profile(persisted_config, profile=None):
+    if not profile:
+        return persisted_config
+    profiles = persisted_config.setdefault("profiles", {})
+    return profiles.setdefault(profile, {})
+
+
+def _api_key_field_for_provider(provider):
+    if provider == PROVIDER_OPENAI:
+        return "openai_api_key"
+    if provider == PROVIDER_CHATGPT_COMPATIBLE:
+        return "chatgpt_api_key"
+    return "api_key"
+
+
+def _base_url_field_for_provider(provider):
+    if provider in {PROVIDER_OPENAI, PROVIDER_OPENAI_COMPATIBLE}:
+        return "openai_base_url" if provider == PROVIDER_OPENAI else "base_url"
+    if provider == PROVIDER_CHATGPT_COMPATIBLE:
+        return "chatgpt_base_url"
+    return "base_url"
+
+
+def _has_provider_base_url(config, provider):
+    if provider == PROVIDER_CHATGPT_COMPATIBLE:
+        return bool(config.get("chatgpt_base_url"))
+    if provider == PROVIDER_OPENAI:
+        return True
+    if provider == PROVIDER_OPENAI_COMPATIBLE:
+        return bool(config.get("base_url") or config.get("openai_base_url"))
+    if provider == PROVIDER_GEMINI_COMPATIBLE:
+        return bool(config.get("base_url"))
+    return True
+
+
+def _apply_config_updates(
+    persisted_config,
+    provider=None,
+    api_key=None,
+    base_url=None,
+    model=None,
+    auth_mode=None,
+    project=None,
+    location=None,
+    profile=None,
+    default_profile=None,
+    clear_base_url=False,
+    clear_model=False,
+    clear_project=False,
+    clear_location=False,
+):
+    target_config = _target_config_for_profile(persisted_config, profile)
+
+    if default_profile:
+        persisted_config["default_profile"] = str(default_profile).strip()
+
+    normalized_provider = None
+    if provider:
+        normalized_provider = _normalize_provider(provider)
+        target_config["provider"] = normalized_provider
+    else:
+        existing_provider = target_config.get("provider")
+        normalized_provider = _normalize_provider(existing_provider) if existing_provider else None
+
+    if auth_mode:
+        target_config["auth_mode"] = _normalize_auth_mode(auth_mode)
+
+    effective_provider = normalized_provider or target_config.get("provider")
+
+    if api_key:
+        key_provider = effective_provider or PROVIDER_GOOGLE_AI_STUDIO
+        target_config[_api_key_field_for_provider(key_provider)] = str(api_key).strip()
+
+    if clear_model:
+        target_config.pop("model", None)
+    elif model is not None:
+        normalized_model = _normalize_model(model)
+        if normalized_model:
+            target_config["model"] = normalized_model
+        else:
+            target_config.pop("model", None)
+
+    if clear_project:
+        target_config.pop("project", None)
+    elif project is not None:
+        normalized_project = str(project).strip()
+        if normalized_project:
+            target_config["project"] = normalized_project
+        else:
+            target_config.pop("project", None)
+
+    if clear_location:
+        target_config.pop("location", None)
+    elif location is not None:
+        normalized_location = str(location).strip()
+        if normalized_location:
+            target_config["location"] = normalized_location
+        else:
+            target_config.pop("location", None)
+
+    if clear_base_url:
+        target_config.pop("base_url", None)
+        target_config.pop("openai_base_url", None)
+        target_config.pop("chatgpt_base_url", None)
+    elif base_url is not None:
+        normalized_base_url = _normalize_base_url(base_url)
+        if normalized_base_url:
+            url_provider = effective_provider or PROVIDER_GEMINI_COMPATIBLE
+            target_config[_base_url_field_for_provider(url_provider)] = normalized_base_url
+        else:
+            target_config.pop("base_url", None)
+            target_config.pop("openai_base_url", None)
+            target_config.pop("chatgpt_base_url", None)
+
+    if "provider" not in target_config:
+        target_config["provider"] = (
+            PROVIDER_GEMINI_COMPATIBLE if target_config.get("base_url") else PROVIDER_GOOGLE_AI_STUDIO
+        )
+
+    if base_url is not None and not provider and target_config.get("base_url"):
+        target_config["provider"] = PROVIDER_GEMINI_COMPATIBLE
+
+    if clear_base_url and not provider and target_config.get("provider") == PROVIDER_GEMINI_COMPATIBLE:
+        target_config["provider"] = PROVIDER_GOOGLE_AI_STUDIO
+
+    return target_config
+
+
+def _validate_persisted_target_config(target_config):
+    provider = target_config.get("provider")
+    if provider == PROVIDER_GEMINI_COMPATIBLE and not target_config.get("base_url"):
+        return "provider 'gemini-compatible' requires a base_url. Use --base-url or switch --provider google-ai-studio."
+    if provider == PROVIDER_OPENAI_COMPATIBLE and not (target_config.get("base_url") or target_config.get("openai_base_url")):
+        return "provider 'openai-compatible' requires a base_url. Use --base-url to point at an OpenAI-compatible endpoint."
+    if provider == PROVIDER_CHATGPT_COMPATIBLE and not target_config.get("chatgpt_base_url"):
+        return "provider 'chatgpt-compatible' requires --base-url or chatgpt_base_url."
+    if provider == PROVIDER_GOOGLE_AI_STUDIO and target_config.get("base_url"):
+        return "provider 'google-ai-studio' cannot keep a custom base_url. Use --clear-base-url or switch --provider gemini-compatible."
+    if provider == PROVIDER_VERTEX_AI and target_config.get("base_url"):
+        return "provider 'vertex-ai' does not use base_url in this runtime. Clear it or switch provider."
+    return None
+
+
+def _write_persisted_config_secure(data):
+    _write_persisted_config(data)
+    try:
+        SKILL_CONFIG_PATH.chmod(0o600)
+    except OSError:
+        pass
+
+
+def _config_set_response(profile=None):
+    response = {
+        "status": "ok",
+        "file": str(SKILL_CONFIG_PATH),
+        "config": _load_persisted_config_snapshot(),
+    }
+    if profile:
+        response["profile"] = profile
+    return response
+
+
+def _load_persisted_for_update_or_exit():
+    try:
+        return _load_persisted_config_for_write()
+    except ValueError as exc:
+        print(json.dumps({"status": "error", "error": str(exc)}, ensure_ascii=False))
+        sys.exit(1)
+
+
+def _save_config_update_or_exit(persisted_config, target_config, profile=None):
+    error = _validate_persisted_target_config(target_config)
+    if error:
+        print(json.dumps({"status": "error", "error": error}, ensure_ascii=False))
+        sys.exit(1)
+    try:
+        _write_persisted_config_secure(persisted_config)
+    except OSError as exc:
+        print(json.dumps({"status": "error", "error": f"Failed to write config: {exc}"}))
+        sys.exit(1)
+    print(json.dumps(_config_set_response(profile=profile), ensure_ascii=False, indent=2))
+
+
 def cmd_config_set(args):
     """Persist BananaHub config under ~/.config/bananahub/config.json."""
     if (
@@ -953,156 +1306,218 @@ def cmd_config_set(args):
         }, ensure_ascii=False))
         sys.exit(1)
 
+    persisted_config = _load_persisted_for_update_or_exit()
     try:
-        persisted_config = _load_persisted_config_for_write()
+        target_config = _apply_config_updates(
+            persisted_config,
+            provider=args.provider,
+            api_key=args.api_key,
+            base_url=args.base_url,
+            model=args.model,
+            auth_mode=args.auth_mode,
+            project=args.project,
+            location=args.location,
+            profile=args.profile,
+            default_profile=args.default_profile,
+            clear_base_url=args.clear_base_url,
+            clear_model=args.clear_model,
+            clear_project=args.clear_project,
+            clear_location=args.clear_location,
+        )
     except ValueError as exc:
         print(json.dumps({"status": "error", "error": str(exc)}, ensure_ascii=False))
         sys.exit(1)
 
-    target_config = persisted_config
-    if args.profile:
-        profiles = persisted_config.setdefault("profiles", {})
-        target_config = profiles.setdefault(args.profile, {})
+    _save_config_update_or_exit(persisted_config, target_config, profile=args.profile)
 
-    if args.default_profile:
-        persisted_config["default_profile"] = args.default_profile.strip()
 
-    explicit_provider = None
-    normalized_provider_for_key = None
-    if args.provider:
-        try:
-            normalized_provider_for_key = _normalize_provider(args.provider)
-        except ValueError as exc:
-            print(json.dumps({"status": "error", "error": str(exc)}, ensure_ascii=False))
-            sys.exit(1)
+def cmd_config_quickset(args):
+    """Persist a complete provider profile with one command."""
+    try:
+        provider = _normalize_provider(args.provider)
+        auth_mode = _normalize_auth_mode(args.auth_mode) if args.auth_mode else AUTH_MODE_API_KEY
+    except ValueError as exc:
+        print(json.dumps({"status": "error", "error": str(exc)}, ensure_ascii=False))
+        sys.exit(1)
 
-    if args.api_key:
-        if normalized_provider_for_key == PROVIDER_OPENAI:
-            key_name = "openai_api_key"
-        elif normalized_provider_for_key == PROVIDER_CHATGPT_COMPATIBLE:
-            key_name = "chatgpt_api_key"
+    required = _provider_required_fields(provider, auth_mode=auth_mode)
+    missing = []
+    if "base_url" in required and not args.base_url:
+        missing.append("--base-url")
+    if "api_key" in required and not args.api_key:
+        missing.append("--api-key")
+    if "project" in required and not args.project:
+        missing.append("--project")
+    if "location" in required and not args.location:
+        missing.append("--location")
+    if missing:
+        print(json.dumps({
+            "status": "error",
+            "error": f"Missing required option(s) for {provider}: {', '.join(missing)}",
+            "required": required,
+        }, ensure_ascii=False))
+        sys.exit(1)
+
+    profile = args.profile or _default_profile_for_provider(provider)
+    model = args.model or _provider_default_model(provider)
+    default_profile = profile if args.default_profile else None
+
+    persisted_config = _load_persisted_for_update_or_exit()
+    try:
+        target_config = _apply_config_updates(
+            persisted_config,
+            provider=provider,
+            api_key=args.api_key,
+            base_url=args.base_url,
+            model=model,
+            auth_mode=auth_mode,
+            project=args.project,
+            location=args.location or (DEFAULT_LOCATION if provider == PROVIDER_VERTEX_AI else None),
+            profile=profile,
+            default_profile=default_profile,
+        )
+    except ValueError as exc:
+        print(json.dumps({"status": "error", "error": str(exc)}, ensure_ascii=False))
+        sys.exit(1)
+
+    _save_config_update_or_exit(persisted_config, target_config, profile=profile)
+
+
+def _diagnose_config_state(config, resolved_from=None, config_sources=None, explicit_resolved_from=None, args=None):
+    resolved_from = resolved_from or {}
+    config_sources = config_sources or []
+    explicit_resolved_from = explicit_resolved_from or {}
+    runtime_support = _runtime_support_status(config)
+    validation_errors = _config_validation_errors(config)
+    provider = runtime_support["provider"]
+    auth_mode = runtime_support["auth_mode"]
+    active_key, active_key_name, active_key_type = _active_api_key(config, runtime_support)
+    effective = _serialize_effective_config(config)
+    missing_fields = []
+
+    if validation_errors:
+        for error in validation_errors:
+            lowered = error.lower()
+            if "api key" in lowered:
+                missing_fields.append("api_key")
+            if "base_url" in lowered or "chatgpt_base_url" in lowered:
+                missing_fields.append("base_url")
+            if "project" in lowered:
+                missing_fields.append("project")
+            if "location" in lowered:
+                missing_fields.append("location")
+    if auth_mode == AUTH_MODE_API_KEY and not active_key:
+        missing_fields.append("api_key")
+    if provider in {PROVIDER_GEMINI_COMPATIBLE, PROVIDER_OPENAI_COMPATIBLE, PROVIDER_CHATGPT_COMPATIBLE} and not effective.get("base_url"):
+        missing_fields.append("base_url")
+    if provider == PROVIDER_VERTEX_AI:
+        if not config.get("GOOGLE_CLOUD_PROJECT"):
+            missing_fields.append("project")
+        if not config.get("GOOGLE_CLOUD_LOCATION"):
+            missing_fields.append("location")
+
+    missing_fields = _dedupe_preserve_order(missing_fields)
+    deps = _dependency_status_for_provider(provider)
+    missing_dependencies = [name for name, present in deps.items() if not present]
+    profile = config.get("BANANAHUB_PROFILE") or _default_profile_for_provider(provider)
+    suggested_commands = []
+    requires_user_secret = "api_key" in missing_fields
+    safe_to_autofix = [field for field in missing_fields if field not in {"api_key"}]
+    default_model = _provider_default_model(provider)
+
+    if missing_fields:
+        if provider == PROVIDER_OPENAI_COMPATIBLE:
+            suggested_commands.append(
+                "python3 scripts/bananahub.py config quickset --provider openai-compatible --profile gpt --default-profile --base-url <base_url> --api-key <api_key> --model gpt-image-2"
+            )
+        elif provider == PROVIDER_OPENAI:
+            suggested_commands.append(
+                "python3 scripts/bananahub.py config quickset --provider openai --profile gpt --default-profile --api-key <api_key> --model gpt-image-2"
+            )
+        elif provider == PROVIDER_CHATGPT_COMPATIBLE:
+            suggested_commands.append(
+                "python3 scripts/bananahub.py config quickset --provider chatgpt-compatible --profile chat --default-profile --base-url <base_url> --api-key <api_key> --model gpt-5.4"
+            )
+        elif provider == PROVIDER_VERTEX_AI:
+            suggested_commands.append(
+                "python3 scripts/bananahub.py config quickset --provider vertex-ai --profile vertex --default-profile --auth-mode adc --project <gcp-project> --location global"
+            )
+        elif provider == PROVIDER_GEMINI_COMPATIBLE:
+            suggested_commands.append(
+                "python3 scripts/bananahub.py config quickset --provider gemini-compatible --profile nano --default-profile --base-url <base_url> --api-key <api_key> --model gemini-3-pro-image-preview"
+            )
         else:
-            key_name = "api_key"
-        target_config[key_name] = args.api_key.strip()
-
-    if args.provider:
-        explicit_provider = normalized_provider_for_key
-        target_config["provider"] = explicit_provider
-
-    if args.auth_mode:
-        try:
-            target_config["auth_mode"] = _normalize_auth_mode(args.auth_mode)
-        except ValueError as exc:
-            print(json.dumps({"status": "error", "error": str(exc)}, ensure_ascii=False))
-            sys.exit(1)
-
-    if args.clear_model:
-        target_config.pop("model", None)
-    elif args.model is not None:
-        normalized_model = _normalize_model(args.model)
-        if normalized_model:
-            target_config["model"] = normalized_model
-        else:
-            target_config.pop("model", None)
-
-    if args.clear_project:
-        target_config.pop("project", None)
-    elif args.project is not None:
-        normalized_project = str(args.project).strip()
-        if normalized_project:
-            target_config["project"] = normalized_project
-        else:
-            target_config.pop("project", None)
-
-    if args.clear_location:
-        target_config.pop("location", None)
-    elif args.location is not None:
-        normalized_location = str(args.location).strip()
-        if normalized_location:
-            target_config["location"] = normalized_location
-        else:
-            target_config.pop("location", None)
-
-    if args.clear_base_url:
-        target_config.pop("base_url", None)
-        target_config.pop("openai_base_url", None)
-        target_config.pop("chatgpt_base_url", None)
-    elif args.base_url is not None:
-        try:
-            normalized_base_url = _normalize_base_url(args.base_url)
-        except ValueError as exc:
-            print(json.dumps({"status": "error", "error": str(exc)}, ensure_ascii=False))
-            sys.exit(1)
-        if normalized_base_url:
-            if explicit_provider == PROVIDER_CHATGPT_COMPATIBLE or target_config.get("provider") == PROVIDER_CHATGPT_COMPATIBLE:
-                target_config["chatgpt_base_url"] = normalized_base_url
-            elif explicit_provider == PROVIDER_OPENAI or target_config.get("provider") == PROVIDER_OPENAI:
-                target_config["openai_base_url"] = normalized_base_url
-            else:
-                target_config["base_url"] = normalized_base_url
-        else:
-            target_config.pop("base_url", None)
-            target_config.pop("openai_base_url", None)
-            target_config.pop("chatgpt_base_url", None)
-
-    if "provider" not in target_config:
-        target_config["provider"] = (
-            PROVIDER_GEMINI_COMPATIBLE if target_config.get("base_url") else PROVIDER_GOOGLE_AI_STUDIO
+            suggested_commands.append(
+                "python3 scripts/bananahub.py config quickset --provider google-ai-studio --profile nano --default-profile --api-key <api_key> --model gemini-3-pro-image-preview"
+            )
+    elif missing_dependencies:
+        suggested_commands.append(" ".join(_dependency_install_command(missing_dependencies)))
+    else:
+        suggested_commands.append(
+            f"python3 scripts/bananahub.py generate \"a cute banana robot sticker\" --model {effective.get('model') or default_model} --no-fallback"
         )
 
-    if args.base_url is not None and not explicit_provider and target_config.get("base_url"):
-        target_config["provider"] = PROVIDER_GEMINI_COMPATIBLE
+    status = "ok" if runtime_support["supported"] and not validation_errors and not missing_fields and not missing_dependencies else "needs_setup"
+    return {
+        "status": status,
+        "provider": provider,
+        "provider_label": _provider_display_name(provider),
+        "profile": profile,
+        "existing_sources": _list_config_sources(config_sources, explicit_resolved_from),
+        "effective_config": effective,
+        "resolved_from": _serialize_resolved_from(resolved_from),
+        "runtime_support": runtime_support,
+        "validation_errors": validation_errors,
+        "active_api_key": {
+            "required": auth_mode == AUTH_MODE_API_KEY,
+            "present": bool(active_key),
+            "config_key": active_key_name,
+            "type": active_key_type,
+            "source": resolved_from.get(active_key_name) if active_key_name else None,
+        },
+        "missing_fields": missing_fields,
+        "missing_dependencies": missing_dependencies,
+        "dependency_install_command": " ".join(_dependency_install_command(missing_dependencies)) if missing_dependencies else None,
+        "requires_user_secret": requires_user_secret,
+        "safe_to_autofix": safe_to_autofix,
+        "suggested_commands": suggested_commands,
+        "manual_init": "python3 scripts/bananahub.py init --wizard",
+        "agent_notes": [
+            "Never ask the user to paste real API keys into chat; prefer the local init wizard or a terminal command.",
+            "Use config quickset for one-command setup when the user already knows provider/base_url/model.",
+            "Install missing dependencies locally before attempting provider calls.",
+            "Use --test-generate only after the user consents to spend image-generation quota.",
+        ],
+    }
 
-    if args.clear_base_url and not explicit_provider and target_config.get("provider") == PROVIDER_GEMINI_COMPATIBLE:
-        target_config["provider"] = PROVIDER_GOOGLE_AI_STUDIO
 
-    if target_config.get("provider") == PROVIDER_GEMINI_COMPATIBLE and not target_config.get("base_url"):
-        print(json.dumps({
-            "status": "error",
-            "error": "provider 'gemini-compatible' requires a base_url. Use --base-url or switch --provider google-ai-studio.",
-        }, ensure_ascii=False))
-        sys.exit(1)
+def cmd_config_doctor(args):
+    """Diagnose config and return actionable setup guidance."""
+    config, resolved_from, config_sources, explicit_resolved_from = _load_merged_config(
+        config_file=getattr(args, "config", None)
+    )
+    config = _apply_command_provider_override(config, getattr(args, "provider", None))
+    diagnosis = _diagnose_config_state(
+        config,
+        resolved_from=resolved_from,
+        config_sources=config_sources,
+        explicit_resolved_from=explicit_resolved_from,
+        args=args,
+    )
+    if getattr(args, "json", False):
+        print(json.dumps(diagnosis, ensure_ascii=False, indent=2))
+        return
 
-    if target_config.get("provider") == PROVIDER_OPENAI_COMPATIBLE and not (target_config.get("base_url") or target_config.get("openai_base_url")):
-        print(json.dumps({
-            "status": "error",
-            "error": "provider 'openai-compatible' requires a base_url. Use --base-url to point at an OpenAI-compatible endpoint.",
-        }, ensure_ascii=False))
-        sys.exit(1)
-
-    if target_config.get("provider") == PROVIDER_CHATGPT_COMPATIBLE and not target_config.get("chatgpt_base_url"):
-        print(json.dumps({
-            "status": "error",
-            "error": "provider 'chatgpt-compatible' requires --base-url or chatgpt_base_url.",
-        }, ensure_ascii=False))
-        sys.exit(1)
-
-    if target_config.get("provider") == PROVIDER_GOOGLE_AI_STUDIO and target_config.get("base_url"):
-        print(json.dumps({
-            "status": "error",
-            "error": "provider 'google-ai-studio' cannot keep a custom base_url. Use --clear-base-url or switch --provider gemini-compatible.",
-        }, ensure_ascii=False))
-        sys.exit(1)
-
-    if target_config.get("provider") == PROVIDER_VERTEX_AI and target_config.get("base_url"):
-        print(json.dumps({
-            "status": "error",
-            "error": "provider 'vertex-ai' does not use base_url in this runtime. Clear it or switch provider.",
-        }, ensure_ascii=False))
-        sys.exit(1)
-
-    try:
-        _write_persisted_config(persisted_config)
-    except OSError as exc:
-        print(json.dumps({"status": "error", "error": f"Failed to write config: {exc}"}))
-        sys.exit(1)
-
-    print(json.dumps({
-        "status": "ok",
-        "file": str(SKILL_CONFIG_PATH),
-        "config": _load_persisted_config_snapshot(),
-    }, ensure_ascii=False, indent=2))
-
+    print(f"BananaHub config doctor: {diagnosis['status']}")
+    print(f"Provider: {diagnosis['provider_label']} ({diagnosis['provider']})")
+    if diagnosis["missing_fields"]:
+        print("Missing: " + ", ".join(diagnosis["missing_fields"]))
+    if diagnosis["validation_errors"]:
+        print("Problems:")
+        for item in diagnosis["validation_errors"]:
+            print(f"- {item}")
+    print("Next command:")
+    print(diagnosis["suggested_commands"][0])
 
 def cmd_telemetry_status(args):
     """Show local telemetry identity and endpoint state."""
@@ -1217,7 +1632,7 @@ def cmd_check_mode(args):
 
 
 IMAGE_KEYWORDS = {"image", "imagen"}
-DEFAULT_MODEL = "gemini-3-pro-image-preview"
+DEFAULT_MODEL = "gpt-image-2"
 DEFAULT_MODEL_BY_PROVIDER = {
     PROVIDER_GOOGLE_AI_STUDIO: "gemini-3-pro-image-preview",
     PROVIDER_GEMINI_COMPATIBLE: "gemini-3-pro-image-preview",
@@ -1507,7 +1922,7 @@ def cmd_models(args):
                 "description": (m.description or "")[:120],
                 "input_token_limit": getattr(m, "input_token_limit", None),
                 "output_token_limit": getattr(m, "output_token_limit", None),
-                "default": model_id == DEFAULT_MODEL,
+                "default": model_id == _provider_default_model(runtime_support["provider"]),
             }
             if raw_model_id != model_id:
                 entry["aliases"] = [raw_model_id]
@@ -2307,7 +2722,18 @@ def main():
 
     # init command
     init_parser = subparsers.add_parser("init", help="Check environment and guide setup")
+    init_parser.add_argument("--wizard", action="store_true", help="Run the beginner-friendly interactive setup wizard")
+    init_parser.add_argument("--json", action="store_true", help="Print machine-readable diagnostics")
     init_parser.add_argument("--skip-test", action="store_true", help="Skip API connectivity test")
+    init_parser.add_argument("--install-deps", action="store_true", help="Install missing Python dependencies for the selected provider")
+    init_parser.add_argument("--provider", choices=sorted(SUPPORTED_PROVIDERS), help="Provider to configure in wizard/non-interactive init")
+    init_parser.add_argument("--profile", help="Named profile to create or update")
+    init_parser.add_argument("--api-key", help="API key to persist; prefer interactive wizard for hidden input")
+    init_parser.add_argument("--base-url", help="Gateway base URL for compatible providers")
+    init_parser.add_argument("--model", help="Default model to persist")
+    init_parser.add_argument("--auth-mode", choices=sorted(SUPPORTED_AUTH_MODES), help="Auth mode for Vertex AI or compatible providers")
+    init_parser.add_argument("--project", help="Google Cloud project for Vertex AI")
+    init_parser.add_argument("--location", help="Google Cloud location for Vertex AI")
 
     # config command
     config_parser = subparsers.add_parser("config", help="Show or persist BananaHub config")
@@ -2315,6 +2741,23 @@ def main():
 
     config_show_parser = config_subparsers.add_parser("show", help="Show effective config resolution")
     config_show_parser.set_defaults(config_handler=cmd_config_show)
+
+    config_doctor_parser = config_subparsers.add_parser("doctor", help="Diagnose config and print the next setup action")
+    config_doctor_parser.add_argument("--provider", choices=sorted(SUPPORTED_PROVIDERS), help="Provider override for diagnosis")
+    config_doctor_parser.add_argument("--json", action="store_true", help="Print machine-readable diagnostics for agents")
+    config_doctor_parser.set_defaults(config_handler=cmd_config_doctor)
+
+    config_quickset_parser = config_subparsers.add_parser("quickset", help="One-command provider/profile setup")
+    config_quickset_parser.add_argument("--provider", required=True, choices=sorted(SUPPORTED_PROVIDERS), help="Provider to configure")
+    config_quickset_parser.add_argument("--profile", help="Named provider profile to update")
+    config_quickset_parser.add_argument("--default-profile", action="store_true", help="Make this profile the default")
+    config_quickset_parser.add_argument("--api-key", help="API key to persist")
+    config_quickset_parser.add_argument("--base-url", help="Gateway base URL for compatible providers")
+    config_quickset_parser.add_argument("--model", help="Default model to persist")
+    config_quickset_parser.add_argument("--auth-mode", choices=sorted(SUPPORTED_AUTH_MODES), help="Auth mode to persist: api_key or adc")
+    config_quickset_parser.add_argument("--project", help="Google Cloud project to persist")
+    config_quickset_parser.add_argument("--location", help="Google Cloud location to persist")
+    config_quickset_parser.set_defaults(config_handler=cmd_config_quickset)
 
     config_set_parser = config_subparsers.add_parser("set", help="Write ~/.config/bananahub/config.json")
     config_set_parser.add_argument(
