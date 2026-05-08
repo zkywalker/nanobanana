@@ -36,10 +36,13 @@ def build_generate_args(**overrides):
         "prompt_output": None,
         "no_fallback": True,
         "openai_size": None,
+        "n": None,
         "quality": None,
         "background": None,
         "output_format": None,
         "output_compression": None,
+        "moderation": None,
+        "user": None,
         "template_id": None,
         "template_repo": None,
         "template_distribution": None,
@@ -77,6 +80,7 @@ def run_generate_with_openai_attempts(attempts, args=None):
         "_archive_prompt_for_command": bananahub._archive_prompt_for_command,
         "_openai_try_generate": bananahub._openai_try_generate,
         "_save_png_bytes": bananahub._save_png_bytes,
+        "_save_image_sequence": bananahub._save_image_sequence,
     }
     import time
 
@@ -86,6 +90,9 @@ def run_generate_with_openai_attempts(attempts, args=None):
     bananahub._archive_prompt_for_command = lambda *call_args, **call_kwargs: None
     bananahub._openai_try_generate = fake_openai_try_generate
     bananahub._save_png_bytes = lambda image_bytes, output_path, resize_dims=None: FakeImage()
+    bananahub._save_image_sequence = lambda image_items, output_path, resize_dims=None, output_format=None: [
+        {"path": output_path, "image": FakeImage()} for _ in image_items
+    ]
     time.sleep = lambda delay: None
     stdout = io.StringIO()
     exit_code = 0
@@ -101,6 +108,7 @@ def run_generate_with_openai_attempts(attempts, args=None):
         bananahub._archive_prompt_for_command = originals["_archive_prompt_for_command"]
         bananahub._openai_try_generate = originals["_openai_try_generate"]
         bananahub._save_png_bytes = originals["_save_png_bytes"]
+        bananahub._save_image_sequence = originals["_save_image_sequence"]
         time.sleep = original_sleep
 
     output = stdout.getvalue().strip()
@@ -112,7 +120,7 @@ def test_transient_network_error_retries_once_by_default_then_succeeds():
     exit_code, payload, calls = run_generate_with_openai_attempts(
         [
             RuntimeError("Network error: Remote end closed connection without response"),
-            (b"fake-png", [], None),
+            ([b"fake-png"], [], None),
         ],
     )
 

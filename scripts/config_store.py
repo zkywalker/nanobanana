@@ -189,8 +189,8 @@ def runtime_support_status(config):
             reasons.append(f"provider '{provider}' requires transport '{cfg.TRANSPORT_OPENAI_REST}', not '{transport}'.")
         if auth_mode != cfg.AUTH_MODE_API_KEY:
             reasons.append(f"provider '{provider}' requires auth_mode '{cfg.AUTH_MODE_API_KEY}', not '{auth_mode}'.")
-        capabilities["edit"] = provider == cfg.PROVIDER_OPENAI
-        capabilities["mask_edit"] = provider == cfg.PROVIDER_OPENAI
+        capabilities["edit"] = provider in {cfg.PROVIDER_OPENAI, cfg.PROVIDER_OPENAI_COMPATIBLE}
+        capabilities["mask_edit"] = provider in {cfg.PROVIDER_OPENAI, cfg.PROVIDER_OPENAI_COMPATIBLE}
         if provider == cfg.PROVIDER_CHATGPT_COMPATIBLE:
             capabilities["edit"] = False
             capabilities["chat_image"] = True

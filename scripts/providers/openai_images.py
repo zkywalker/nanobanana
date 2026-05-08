@@ -5,6 +5,10 @@ import base64
 from .common import http_fetch_bytes, http_json_request, http_multipart_request, join_endpoint
 
 
+def is_gpt_image_model(model):
+    return str(model or "").strip().startswith("gpt-image")
+
+
 def auth_headers(config, provider_openai="openai", default_provider="google-ai-studio"):
     provider = config.get("BANANAHUB_PROVIDER", default_provider)
     api_key = config.get("OPENAI_API_KEY", "") if provider == provider_openai else config.get("GEMINI_API_KEY", "")
@@ -29,14 +33,18 @@ def build_generation_payload(
     background=None,
     output_format=None,
     output_compression=None,
+    n=None,
+    moderation=None,
+    user=None,
     provider=None,
 ):
     is_openai_compatible = provider == "openai-compatible"
+    is_gpt_image = is_gpt_image_model(model)
     payload = {
         "model": model,
         "prompt": prompt,
     }
-    if not is_openai_compatible:
+    if not is_openai_compatible and not is_gpt_image:
         payload["response_format"] = "b64_json"
     warnings = []
 
@@ -56,8 +64,14 @@ def build_generation_payload(
         payload["output_format"] = "png"
     if output_compression is not None:
         payload["output_compression"] = output_compression
+    if n is not None:
+        payload["n"] = n
+    if moderation:
+        payload["moderation"] = moderation
+    if user:
+        payload["user"] = user
 
-    if aspect_ratio and aspect_ratio != "1:1":
+    if is_openai_compatible and aspect_ratio and aspect_ratio != "1:1":
         payload["extra_body"] = {"google": {"aspect_ratio": aspect_ratio}}
 
     if native_image_size:
@@ -76,23 +90,40 @@ def build_generation_payload(
     return payload, warnings
 
 
-def extract_image_bytes(response):
+def extract_images(response):
     items = response.get("data") if isinstance(response, dict) else None
     if not isinstance(items, list) or not items:
-        return None, "No image generated. The endpoint returned an empty response."
-    first = items[0]
-    if not isinstance(first, dict):
-        return None, "No image generated. The endpoint returned an invalid payload."
-    b64_json = first.get("b64_json")
-    if b64_json:
-        try:
-            return base64.b64decode(b64_json), None
-        except Exception as exc:
-            return None, f"Failed to decode image bytes: {exc}"
-    image_url = first.get("url")
-    if image_url:
-        return http_fetch_bytes(image_url), None
-    return None, "No image found in response."
+        return [], "No image generated. The endpoint returned an empty response."
+
+    images = []
+    errors = []
+    for index, item in enumerate(items, 1):
+        if not isinstance(item, dict):
+            errors.append(f"Image {index}: invalid payload item.")
+            continue
+        b64_json = item.get("b64_json")
+        if b64_json:
+            try:
+                images.append(base64.b64decode(b64_json))
+            except Exception as exc:
+                errors.append(f"Image {index}: failed to decode image bytes: {exc}")
+            continue
+        image_url = item.get("url")
+        if image_url:
+            images.append(http_fetch_bytes(image_url))
+            continue
+        errors.append(f"Image {index}: no image data found in response.")
+
+    if images:
+        return images, None
+    return [], errors[0] if errors else "No image found in response."
+
+
+def extract_image_bytes(response):
+    images, error = extract_images(response)
+    if error:
+        return None, error
+    return images[0], None
 
 
 def list_models(config, resolve_endpoint, canonicalize_model, default_model, provider_openai="openai", default_provider="google-ai-studio"):
@@ -125,7 +156,24 @@ def list_models(config, resolve_endpoint, canonicalize_model, default_model, pro
     return models
 
 
-def try_generate(config, model, prompt, aspect_ratio, resolve_endpoint, image_size=None, openai_size=None, quality=None, background=None, output_format=None, output_compression=None, provider_openai="openai", default_provider="google-ai-studio"):
+def try_generate(
+    config,
+    model,
+    prompt,
+    aspect_ratio,
+    resolve_endpoint,
+    image_size=None,
+    openai_size=None,
+    quality=None,
+    background=None,
+    output_format=None,
+    output_compression=None,
+    n=None,
+    moderation=None,
+    user=None,
+    provider_openai="openai",
+    default_provider="google-ai-studio",
+):
     provider = config.get("BANANAHUB_PROVIDER", default_provider)
     payload, warnings = build_generation_payload(
         model,
@@ -137,6 +185,9 @@ def try_generate(config, model, prompt, aspect_ratio, resolve_endpoint, image_si
         background=background,
         output_format=output_format,
         output_compression=output_compression,
+        n=n,
+        moderation=moderation,
+        user=user,
         provider=provider,
     )
     endpoint_resolution = resolve_endpoint(provider_base_url(config))
@@ -148,24 +199,98 @@ def try_generate(config, model, prompt, aspect_ratio, resolve_endpoint, image_si
         payload=payload,
         timeout=120,
     )
-    image_bytes, error = extract_image_bytes(response)
-    return image_bytes, warnings, error
+    images, error = extract_images(response)
+    return images, warnings, error
 
 
-def try_edit(config, model, prompt, input_path, resolve_endpoint, ref_paths=None, mask_path=None, size=None, provider_openai="openai", default_provider="google-ai-studio"):
-    endpoint_resolution = resolve_endpoint(provider_base_url(config))
+def build_edit_fields(
+    model,
+    prompt,
+    size=None,
+    quality=None,
+    background=None,
+    output_format=None,
+    output_compression=None,
+    n=None,
+    moderation=None,
+    input_fidelity=None,
+    user=None,
+):
     fields = {
         "model": model,
         "prompt": prompt,
-        "response_format": "b64_json",
     }
+    if not is_gpt_image_model(model):
+        fields["response_format"] = "b64_json"
     if size:
         fields["size"] = size
-    files = [{"field": "image", "path": input_path}]
-    for ref_path in ref_paths or []:
-        files.append({"field": "image", "path": ref_path})
+    if quality:
+        fields["quality"] = quality
+    if background:
+        fields["background"] = background
+    if output_format:
+        fields["output_format"] = output_format
+    if output_compression is not None:
+        fields["output_compression"] = output_compression
+    if n is not None:
+        fields["n"] = n
+    if moderation:
+        fields["moderation"] = moderation
+    if input_fidelity:
+        fields["input_fidelity"] = input_fidelity
+    if user:
+        fields["user"] = user
+    return fields
+
+
+def build_edit_files(input_path, ref_paths=None, mask_path=None):
+    image_paths = [input_path, *(ref_paths or [])]
+    image_field = "image[]" if len(image_paths) > 1 else "image"
+    files = [{"field": image_field, "path": path} for path in image_paths]
     if mask_path:
         files.append({"field": "mask", "path": mask_path})
+    return files
+
+
+def try_edit(
+    config,
+    model,
+    prompt,
+    input_path,
+    resolve_endpoint,
+    ref_paths=None,
+    mask_path=None,
+    size=None,
+    quality=None,
+    background=None,
+    output_format=None,
+    output_compression=None,
+    n=None,
+    moderation=None,
+    input_fidelity=None,
+    user=None,
+    provider_openai="openai",
+    default_provider="google-ai-studio",
+):
+    endpoint_resolution = resolve_endpoint(provider_base_url(config))
+    warnings = list(endpoint_resolution["warnings"])
+    if input_fidelity and str(model or "").strip() == "gpt-image-2":
+        warnings.append("`input_fidelity` is omitted for gpt-image-2 because the OpenAI API handles image inputs at high fidelity automatically.")
+        input_fidelity = None
+    fields = build_edit_fields(
+        model,
+        prompt,
+        size=size,
+        quality=quality,
+        background=background,
+        output_format=output_format,
+        output_compression=output_compression,
+        n=n,
+        moderation=moderation,
+        input_fidelity=input_fidelity,
+        user=user,
+    )
+    files = build_edit_files(input_path, ref_paths=ref_paths, mask_path=mask_path)
     response = http_multipart_request(
         "POST",
         join_endpoint(endpoint_resolution["resolved_base_url"], "images/edits"),
@@ -174,5 +299,5 @@ def try_edit(config, model, prompt, input_path, resolve_endpoint, ref_paths=None
         files=files,
         timeout=120,
     )
-    image_bytes, error = extract_image_bytes(response)
-    return image_bytes, endpoint_resolution["warnings"], error
+    images, error = extract_images(response)
+    return images, warnings, error

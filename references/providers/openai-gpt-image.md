@@ -4,7 +4,7 @@ Use this guide only after the core optimization pipeline has selected OpenAI GPT
 
 ## Model Family
 
-GPT Image models are OpenAI-native image models. Use provider id `openai` for official OpenAI APIs. Do not treat `openai-compatible` as equivalent unless the endpoint explicitly declares GPT Image-compatible capabilities.
+GPT Image models are OpenAI-native image models. Use provider id `openai` for official OpenAI APIs. `openai-compatible` can attempt the same Images API paths, but gateway-specific support must be verified.
 
 Canonical model ids and aliases are resolved through `references/model-registry.json`.
 
@@ -18,10 +18,10 @@ Canonical model ids and aliases are resolved through `references/model-registry.
 
 ## Runtime Options
 
-- Use OpenAI-native `size`, `quality`, `background`, `output_format`, and `output_compression` only when the selected model supports them. BananaHub exposes these as `--openai-size`, `--quality`, `--background`, `--output-format`, and `--output-compression`.
+- Use OpenAI-native `size`, `n`, `quality`, `background`, `output_format`, `output_compression`, and `moderation` only when the selected model supports them. BananaHub exposes these as `--openai-size`, `--n`, `--quality`, `--background`, `--output-format`, `--output-compression`, and `--moderation`.
 - Do not map Gemini `aspect_ratio` or `1K/2K/4K` presets directly to GPT Image. Convert intent through the OpenAI provider adapter.
 - OpenAI-native edit and mask edit should be routed to the OpenAI provider adapter, not the legacy Gemini `openai-compatible` path.
-- BananaHub exposes mask editing through `edit --mask <mask.png>` for the OpenAI-native provider.
+- BananaHub exposes multi-image editing with `edit --input <source.png> --ref <reference...>` and mask editing through `edit --mask <mask.png>` for the OpenAI-native provider.
 - Validate image/mask file requirements in the provider adapter before calling the API.
 
 ## Template Guidance

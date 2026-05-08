@@ -75,7 +75,12 @@ For CLI checks, use `BANANAHUB_HOST_IMAGEGEN=1` or `check-mode --host-imagegen` 
 | `--provider <id>` | Override provider for one run, e.g. `openai`, `google-ai-studio` |
 | `--aspect <ratio>` | Aspect ratio, e.g. `16:9`, `1:1`, `9:16` |
 | `--image-size <preset>` | Gemini native size preset: `1K`, `2K`, `4K` |
+| `--n <count>` | OpenAI Images API number of generated/edited outputs |
 | `--openai-size <value>` | OpenAI Images API native size option |
+| `--quality <value>` | Provider-native quality preset |
+| `--background <value>` | Provider-native background option |
+| `--output-format <value>` | Provider-native output format, e.g. `png`, `jpeg`, `webp` |
+| `--output-compression <value>` | Provider-native output compression when supported |
 | `--resize <WxH>` | Resize after generation/editing |
 | `--output <path>` | Image output path |
 | `--save-prompt` | Archive the final prompt under `bananahub-prompts/` |
@@ -111,8 +116,8 @@ BananaHub supports several provider routes. Advanced capabilities are not assume
 | `google-ai-studio` | Default path for individuals and teams | ✅ | ✅ | — | Gemini / Nano Banana route |
 | `gemini-compatible` | Gemini-style relays or proxies | ✅ | ✅ | — | Depends on the relay |
 | `vertex-ai` | Enterprise GCP / Vertex AI | ✅ | ✅ | — | ADC or API key auth |
-| `openai` | Official OpenAI GPT Image APIs | ✅ | ✅ | ✅ | GPT Image native route |
-| `openai-compatible` | OpenAI-style gateways | ✅ | Gateway-dependent | Gateway-dependent | No advanced capability is assumed |
+| `openai` | Official OpenAI GPT Image APIs | ✅ | ✅ | ✅ | GPT Image native route; supports multi-output and multi-image edits through Images API |
+| `openai-compatible` | OpenAI-style gateways | ✅ | ✅ | ✅ | Attempts standard Images API features; actual support is gateway-dependent |
 | `chatgpt-compatible` | Chat/completions endpoints that return images | ✅ | — | — | Best-effort URL/base64 extraction |
 
 Setup examples:

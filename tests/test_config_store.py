@@ -44,6 +44,21 @@ def test_chatgpt_inference_and_validation():
     assert support["capabilities"]["edit"] is False
 
 
+def test_openai_compatible_exposes_images_api_edit_capabilities():
+    config = {
+        "BANANAHUB_PROVIDER": "openai-compatible",
+        "BANANAHUB_TRANSPORT": "openai-rest",
+        "BANANAHUB_AUTH_MODE": "api_key",
+        "GEMINI_API_KEY": "k",
+        "OPENAI_BASE_URL": "https://example.com/v1",
+    }
+    support = config_store.runtime_support_status(config)
+
+    assert support["supported"] is True
+    assert support["capabilities"]["edit"] is True
+    assert support["capabilities"]["mask_edit"] is True
+
+
 def test_command_provider_override():
     config = {"BANANAHUB_PROVIDER": "google-ai-studio", "BANANAHUB_TRANSPORT": "genai"}
     updated = config_store.apply_command_provider_override(config, "openai")
@@ -95,6 +110,7 @@ def test_persisted_config_roundtrip(tmp_path=None):
 if __name__ == "__main__":
     test_profile_merge()
     test_chatgpt_inference_and_validation()
+    test_openai_compatible_exposes_images_api_edit_capabilities()
     test_command_provider_override()
     test_persisted_config_roundtrip()
     print("ok")

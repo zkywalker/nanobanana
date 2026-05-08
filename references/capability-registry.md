@@ -49,16 +49,17 @@ If a capability changes request payload shape, file validation, cost, policy beh
 ### `gpt-image`
 
 - Supports text-to-image through OpenAI Images API.
-- Supports image editing and mask editing through OpenAI-native image endpoints or Responses API image generation tools.
-- Uses OpenAI-native options such as `size`, `quality`, `background`, `output_format`, and `output_compression` when supported by the selected model.
+- Supports image editing, multi-image references, and mask editing through OpenAI-native image endpoints or Responses API image generation tools.
+- Uses OpenAI-native options such as `size`, `n`, `quality`, `background`, `output_format`, `output_compression`, and `moderation` when supported by the selected model.
 - Prompting should be stricter about layout, exact text, edit deltas, and "keep everything else unchanged" instructions.
 - Do not inherit Gemini-specific limits such as 14 reference images or `1K/2K/4K` size presets unless the selected OpenAI model/provider explicitly supports an equivalent.
 
 ### `unknown-openai-compatible`
 
 - Represents third-party OpenAI-style endpoints with unknown image capabilities.
-- Do not assume native GPT Image behavior, edit support, mask support, pricing, or size constraints.
-- Require explicit configured capabilities or a successful dry-run/healthcheck before advertising advanced features.
+- The runtime can attempt standard Images API generation, editing, multi-image references, and mask fields.
+- Do not assume model-specific quality, pricing, size constraints, or advanced options beyond what the gateway actually accepts.
+- Require explicit configured capabilities or a successful provider call before advertising advanced features as verified.
 
 ## Selection Policy
 

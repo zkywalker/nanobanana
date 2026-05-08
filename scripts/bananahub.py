@@ -622,7 +622,21 @@ def _list_openai_models(config):
         default_provider=DEFAULT_PROVIDER,
     )
 
-def _openai_try_generate(config, model, prompt, aspect_ratio, image_size=None, openai_size=None, quality=None, background=None, output_format=None, output_compression=None):
+def _openai_try_generate(
+    config,
+    model,
+    prompt,
+    aspect_ratio,
+    image_size=None,
+    openai_size=None,
+    quality=None,
+    background=None,
+    output_format=None,
+    output_compression=None,
+    n=None,
+    moderation=None,
+    user=None,
+):
     """Attempt image generation against an OpenAI-compatible endpoint."""
     return openai_provider.try_generate(
         config,
@@ -636,6 +650,9 @@ def _openai_try_generate(config, model, prompt, aspect_ratio, image_size=None, o
         background=background,
         output_format=output_format,
         output_compression=output_compression,
+        n=n,
+        moderation=moderation,
+        user=user,
         provider_openai=PROVIDER_OPENAI,
         default_provider=DEFAULT_PROVIDER,
     )
@@ -644,7 +661,23 @@ def _extract_openai_image_bytes(response):
     """Extract image bytes from OpenAI Images API response."""
     return openai_provider.extract_image_bytes(response)
 
-def _openai_try_edit(config, model, prompt, input_path, ref_paths=None, mask_path=None, size=None):
+def _openai_try_edit(
+    config,
+    model,
+    prompt,
+    input_path,
+    ref_paths=None,
+    mask_path=None,
+    size=None,
+    quality=None,
+    background=None,
+    output_format=None,
+    output_compression=None,
+    n=None,
+    moderation=None,
+    input_fidelity=None,
+    user=None,
+):
     """Attempt OpenAI-native image editing via multipart Images API."""
     return openai_provider.try_edit(
         config,
@@ -655,6 +688,14 @@ def _openai_try_edit(config, model, prompt, input_path, ref_paths=None, mask_pat
         ref_paths=ref_paths,
         mask_path=mask_path,
         size=size,
+        quality=quality,
+        background=background,
+        output_format=output_format,
+        output_compression=output_compression,
+        n=n,
+        moderation=moderation,
+        input_fidelity=input_fidelity,
+        user=user,
         provider_openai=PROVIDER_OPENAI,
         default_provider=DEFAULT_PROVIDER,
     )
@@ -2046,6 +2087,56 @@ def _save_png_bytes(image_bytes, output_path, resize_dims=None):
     return image
 
 
+def _provider_output_format(args):
+    normalized = str(getattr(args, "output_format", "") or "").strip().lower()
+    if normalized in {"jpg", "jpeg"}:
+        return "jpeg"
+    if normalized in {"png", "webp"}:
+        return normalized
+    return "png"
+
+
+def _output_path_for_index(base_path, index):
+    if index <= 1:
+        return base_path
+    suffix = base_path.suffix or ".png"
+    return base_path.with_name(f"{base_path.stem}_{index}{suffix}")
+
+
+def _save_image_bytes(image_bytes, output_path, resize_dims=None, output_format=None):
+    from PIL import Image
+    import io
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    if resize_dims:
+        image = Image.open(io.BytesIO(image_bytes))
+        image = image.resize(resize_dims, Image.LANCZOS)
+        save_format = (output_format or output_path.suffix.lstrip(".") or "png").upper()
+        if save_format == "JPG":
+            save_format = "JPEG"
+        image.save(str(output_path), save_format)
+        return image
+
+    output_path.write_bytes(image_bytes)
+    image = Image.open(io.BytesIO(image_bytes))
+    image.load()
+    return image
+
+
+def _save_image_sequence(image_items, base_output_path, resize_dims=None, output_format=None):
+    saved = []
+    for index, image_bytes in enumerate(image_items, 1):
+        output_path = _output_path_for_index(base_output_path, index)
+        image = _save_image_bytes(
+            image_bytes,
+            output_path,
+            resize_dims=resize_dims,
+            output_format=output_format,
+        )
+        saved.append({"path": output_path, "image": image})
+    return saved
+
+
 def cmd_edit(args):
     """Edit an existing image based on a text prompt, with automatic model fallback."""
     import io
@@ -2081,11 +2172,15 @@ def cmd_edit(args):
             "native_image_size": native_image_size,
             "post_resize": f"{resize_dims[0]}x{resize_dims[1]}" if resize_dims else None,
             "provider_options": {
+                "n": getattr(args, "n", None),
                 "openai_size": getattr(args, "openai_size", None),
                 "quality": getattr(args, "quality", None),
                 "background": getattr(args, "background", None),
                 "output_format": getattr(args, "output_format", None),
                 "output_compression": getattr(args, "output_compression", None),
+                "moderation": getattr(args, "moderation", None),
+                "input_fidelity": getattr(args, "input_fidelity", None),
+                "user": getattr(args, "user", None),
             },
             "warnings": option_warnings,
         }, ensure_ascii=False))
@@ -2096,7 +2191,7 @@ def cmd_edit(args):
             "status": "error",
             "error": (
                 f"provider '{runtime_support['provider']}' does not support image edit in this runtime yet. "
-                "Use google-ai-studio, gemini-compatible, vertex-ai, or openai for edit."
+                "Use google-ai-studio, gemini-compatible, vertex-ai, openai, or an OpenAI-compatible Images API gateway for edit."
             ),
         }, ensure_ascii=False))
         sys.exit(1)
@@ -2142,10 +2237,27 @@ def cmd_edit(args):
         }, ensure_ascii=False))
         sys.exit(1)
 
-    if runtime_support["provider"] != PROVIDER_OPENAI and mask_path:
+    if runtime_support["transport"] != TRANSPORT_OPENAI_REST and getattr(args, "n", None):
         print(json.dumps({
             "status": "error",
-            "error": "--mask is only supported by the OpenAI-native provider in this runtime.",
+            "error": "--n is only supported for OpenAI REST image providers in this runtime.",
+        }, ensure_ascii=False))
+        sys.exit(1)
+
+    if runtime_support["transport"] != TRANSPORT_OPENAI_REST and any(
+        getattr(args, name, None)
+        for name in ("openai_size", "quality", "background", "output_format", "output_compression", "moderation", "input_fidelity", "user")
+    ):
+        print(json.dumps({
+            "status": "error",
+            "error": "OpenAI-native edit options require an OpenAI REST image provider.",
+        }, ensure_ascii=False))
+        sys.exit(1)
+
+    if runtime_support["transport"] != TRANSPORT_OPENAI_REST and mask_path:
+        print(json.dumps({
+            "status": "error",
+            "error": "--mask is only supported by OpenAI REST image providers in this runtime.",
         }, ensure_ascii=False))
         sys.exit(1)
 
@@ -2172,6 +2284,7 @@ def cmd_edit(args):
             "input": str(input_path),
             "ref": [str(rp) for rp in ref_paths],
             "mask": str(mask_path) if mask_path else None,
+            "n": getattr(args, "n", None),
         },
     )
 
@@ -2186,13 +2299,22 @@ def cmd_edit(args):
         for model in models_to_try:
             for attempt in range(1 + retries):
                 try:
-                    image_bytes, extra_warnings, gen_error = _openai_try_edit(
+                    image_items, extra_warnings, gen_error = _openai_try_edit(
                         config_data,
                         model,
                         prompt,
                         input_path,
                         ref_paths=ref_paths,
                         mask_path=mask_path,
+                        size=getattr(args, "openai_size", None),
+                        quality=getattr(args, "quality", None),
+                        background=getattr(args, "background", None),
+                        output_format=getattr(args, "output_format", None),
+                        output_compression=getattr(args, "output_compression", None),
+                        n=getattr(args, "n", None),
+                        moderation=getattr(args, "moderation", None),
+                        input_fidelity=getattr(args, "input_fidelity", None),
+                        user=getattr(args, "user", None),
                     )
                     if gen_error:
                         print(json.dumps({
@@ -2206,18 +2328,31 @@ def cmd_edit(args):
                         sys.exit(1)
 
                     output_path = Path(user_output) if user_output else _default_output_path("bananahub_edit", model)
-                    image = _save_png_bytes(image_bytes, output_path, resize_dims=resize_dims)
+                    provider_format = _provider_output_format(args)
+                    if getattr(args, "output_format", None) and not user_output:
+                        output_path = output_path.with_suffix(f".{provider_format}")
+                    saved_images = _save_image_sequence(
+                        image_items,
+                        output_path,
+                        resize_dims=resize_dims,
+                        output_format=provider_format,
+                    )
+                    first_image = saved_images[0]["image"]
+                    output_files = [str(item["path"]) for item in saved_images]
                     result = {
                         "status": "ok",
-                        "file": str(output_path),
+                        "file": output_files[0],
                         "input": str(input_path),
                         "requested_model": requested_model_input,
                         "actual_model": model,
                         "prompt": prompt,
                         "prompt_file": str(saved_prompt_path) if saved_prompt_path else None,
-                        "image_size": f"{image.width}x{image.height}",
-                        "total_images": 1 + len(ref_paths),
+                        "image_size": f"{first_image.width}x{first_image.height}",
+                        "input_images": 1 + len(ref_paths),
+                        "generated_images": len(saved_images),
                     }
+                    if len(output_files) > 1:
+                        result["files"] = output_files
                     if requested_model_input != requested_model:
                         result["resolved_requested_model"] = requested_model
                     if mask_path:
@@ -2460,11 +2595,14 @@ def cmd_generate(args):
             "post_resize": f"{resize_dims[0]}x{resize_dims[1]}" if resize_dims else None,
             "fallback_chain": [requested_model] if getattr(args, "no_fallback", False) else _dedupe_preserve_order([requested_model] + _get_fallback_models(requested_model, runtime_support["provider"])),
             "provider_options": {
+                "n": getattr(args, "n", None),
                 "openai_size": getattr(args, "openai_size", None),
                 "quality": getattr(args, "quality", None),
                 "background": getattr(args, "background", None),
                 "output_format": getattr(args, "output_format", None),
                 "output_compression": getattr(args, "output_compression", None),
+                "moderation": getattr(args, "moderation", None),
+                "user": getattr(args, "user", None),
             },
             "warnings": option_warnings,
         }, ensure_ascii=False))
@@ -2481,6 +2619,22 @@ def cmd_generate(args):
     no_fallback = getattr(args, "no_fallback", False)
     retries = getattr(args, "retries", 1)
 
+    if runtime_support["transport"] != TRANSPORT_OPENAI_REST and getattr(args, "n", None):
+        print(json.dumps({
+            "status": "error",
+            "error": "--n is only supported for OpenAI REST image providers in this runtime.",
+        }, ensure_ascii=False))
+        sys.exit(1)
+    if runtime_support["transport"] != TRANSPORT_OPENAI_REST and any(
+        getattr(args, name, None)
+        for name in ("openai_size", "quality", "background", "output_format", "output_compression", "moderation", "user")
+    ):
+        print(json.dumps({
+            "status": "error",
+            "error": "OpenAI-native generation options require an OpenAI REST image provider.",
+        }, ensure_ascii=False))
+        sys.exit(1)
+
     # Determine output path (default: current working directory with model name)
     user_output = args.output
     saved_prompt_path = _archive_prompt_for_command(
@@ -2491,6 +2645,7 @@ def cmd_generate(args):
             "provider": runtime_support["provider"],
             "requested_model": requested_model_input,
             "aspect_ratio": aspect_ratio,
+            "n": getattr(args, "n", None),
         },
     )
 
@@ -2516,7 +2671,7 @@ def cmd_generate(args):
                     )
                     image_part = None
                 elif runtime_support["transport"] == TRANSPORT_OPENAI_REST:
-                    image_bytes, extra_warnings, gen_error = _openai_try_generate(
+                    image_items, extra_warnings, gen_error = _openai_try_generate(
                         config,
                         model,
                         prompt,
@@ -2527,7 +2682,11 @@ def cmd_generate(args):
                         background=getattr(args, "background", None),
                         output_format=getattr(args, "output_format", None),
                         output_compression=getattr(args, "output_compression", None),
+                        n=getattr(args, "n", None),
+                        moderation=getattr(args, "moderation", None),
+                        user=getattr(args, "user", None),
                     )
+                    image_bytes = image_items[0] if image_items else None
                     image_part = None
                 else:
                     image_part, gen_error = _try_generate(
@@ -2581,11 +2740,25 @@ def cmd_generate(args):
                 else:
                     output_path = _default_output_path("bananahub", model)
 
-                image = _save_png_bytes(image_bytes, output_path, resize_dims=resize_dims)
+                if runtime_support["transport"] == TRANSPORT_OPENAI_REST:
+                    provider_format = _provider_output_format(args)
+                    if getattr(args, "output_format", None) and not user_output:
+                        output_path = output_path.with_suffix(f".{provider_format}")
+                    saved_images = _save_image_sequence(
+                        image_items,
+                        output_path,
+                        resize_dims=resize_dims,
+                        output_format=provider_format,
+                    )
+                    image = saved_images[0]["image"]
+                    output_files = [str(item["path"]) for item in saved_images]
+                else:
+                    image = _save_png_bytes(image_bytes, output_path, resize_dims=resize_dims)
+                    output_files = [str(output_path)]
 
                 result = {
                     "status": "ok",
-                    "file": str(output_path),
+                    "file": output_files[0],
                     "requested_model": requested_model_input,
                     "actual_model": model,
                     "prompt": prompt,
@@ -2593,6 +2766,9 @@ def cmd_generate(args):
                     "aspect_ratio": aspect_ratio,
                     "image_size": f"{image.width}x{image.height}",
                 }
+                if len(output_files) > 1:
+                    result["files"] = output_files
+                    result["generated_images"] = len(output_files)
                 if requested_model_input != requested_model:
                     result["resolved_requested_model"] = requested_model
                 if native_image_size:
@@ -2676,11 +2852,14 @@ def main():
     gen_parser.add_argument("--model", "-m", help="Model ID (default depends on provider)")
     gen_parser.add_argument("--aspect", "-a", help="Aspect ratio, e.g. 1:1, 16:9, 9:16 (default: 1:1)")
     gen_parser.add_argument("--image-size", help="Native image-size preset: 1K, 2K, or 4K")
+    gen_parser.add_argument("--n", type=int, help="OpenAI-native number of images to generate")
     gen_parser.add_argument("--openai-size", help="OpenAI-native size, e.g. 1024x1024 or model-supported custom size")
     gen_parser.add_argument("--quality", help="Provider-native quality preset, e.g. low/medium/high/auto")
     gen_parser.add_argument("--background", help="Provider-native background option, e.g. transparent/opaque/auto")
     gen_parser.add_argument("--output-format", help="Provider-native output format, e.g. png/jpeg/webp")
     gen_parser.add_argument("--output-compression", type=int, help="Provider-native output compression when supported")
+    gen_parser.add_argument("--moderation", help="OpenAI-native moderation mode when supported")
+    gen_parser.add_argument("--user", help="OpenAI user identifier for abuse monitoring")
     gen_parser.add_argument("--resize", help="Post-process resize to WxH, e.g. 1024x1024")
     gen_parser.add_argument("--size", "-s", help="Legacy compatibility flag: use 1K/2K/4K for native image size, or WxH for post-processing resize")
     gen_parser.add_argument("--output", "-o", help="Output file path (default: current directory)")
@@ -2700,6 +2879,15 @@ def main():
     edit_parser.add_argument("--provider", choices=sorted(SUPPORTED_PROVIDERS), help="Provider override for this command")
     edit_parser.add_argument("--model", "-m", help="Model ID (default depends on provider)")
     edit_parser.add_argument("--image-size", help="Native image-size preset: 1K, 2K, or 4K")
+    edit_parser.add_argument("--n", type=int, help="OpenAI-native number of edited images to generate")
+    edit_parser.add_argument("--openai-size", help="OpenAI-native size, e.g. 1024x1024 or model-supported custom size")
+    edit_parser.add_argument("--quality", help="Provider-native quality preset, e.g. low/medium/high/auto")
+    edit_parser.add_argument("--background", help="Provider-native background option, e.g. transparent/opaque/auto")
+    edit_parser.add_argument("--output-format", help="Provider-native output format, e.g. png/jpeg/webp")
+    edit_parser.add_argument("--output-compression", type=int, help="Provider-native output compression when supported")
+    edit_parser.add_argument("--moderation", help="OpenAI-native moderation mode when supported")
+    edit_parser.add_argument("--input-fidelity", help="OpenAI-native input fidelity hint when supported, e.g. high/low")
+    edit_parser.add_argument("--user", help="OpenAI user identifier for abuse monitoring")
     edit_parser.add_argument("--resize", help="Post-process resize to WxH, e.g. 1024x1024")
     edit_parser.add_argument("--size", "-s", help="Legacy compatibility flag: use 1K/2K/4K for native image size, or WxH for post-processing resize")
     edit_parser.add_argument("--output", "-o", help="Output file path (default: current directory)")
