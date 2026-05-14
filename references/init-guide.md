@@ -1,24 +1,25 @@
 # Initialization Flow
 
-When the user runs `init`, make BananaHub usable with the least possible back-and-forth. Prefer local CLI commands over asking the user to paste secrets into chat.
+When the user runs `init`, make BananaHub usable with the least possible back-and-forth. Agents should persist image API connection details with non-interactive `config quickset` profile writes.
 
 ## Agent Rules
 
-1. Never ask the user to paste a real API key into the chat. Use the local wizard (`init --wizard`) or generate a shell command where the user fills `<api-key>` in their terminal.
+1. Do not assume the agent can run interactive TTY prompts.
 2. Start with machine-readable diagnosis:
    ```bash
    python3 {baseDir}/scripts/bananahub.py config doctor --json
    ```
-3. If the user is non-technical or unsure, run:
+3. If provider fields are missing, ask only for the missing provider-required values.
+4. Direct API-key entry is allowed when the user chooses it or already pasted a key. Write it with `config quickset --api-key-stdin` and do not echo it back.
+5. If the user does not want secrets in chat, provide the matching `config quickset` command with placeholders for their local terminal.
+6. Use the interactive wizard only as a human-terminal fallback:
    ```bash
    python3 {baseDir}/scripts/bananahub.py init --wizard
-# or, to let BananaHub install missing Python packages first:
-python3 {baseDir}/scripts/bananahub.py init --wizard --install-deps
    ```
-4. If the user already knows their provider/base URL/model, use `config quickset` instead of walking them through manual JSON edits.
-5. Do not run a paid image-generation test unless the user explicitly agrees. Model-list healthchecks are okay; generation smoke tests require consent.
-6. Default to GPT Image 2 through `openai-compatible` unless the user explicitly chooses another image channel or an existing config already resolves cleanly.
-7. Do not ask the user to interpret `resolved_from`, provider aliases, or ignored env vars. Use `effective_config`, `missing_fields`, and `ignored_config_sources` yourself and only surface the next action.
+7. If dependencies are missing and the user allows package installation, run `dependency_install_command` from `config doctor --json`; do not add `--break-system-packages` automatically.
+8. Do not run a paid image-generation test unless the user explicitly agrees. Model-list healthchecks are okay; generation smoke tests require consent.
+9. Default to GPT Image 2 through `openai-compatible` unless the user explicitly chooses another image channel or an existing config already resolves cleanly.
+10. Do not ask the user to interpret `resolved_from`, provider aliases, or ignored env vars. Use `effective_config`, `missing_fields`, and `ignored_config_sources` yourself and only surface the next action.
 
 ## Provider Selection
 
@@ -39,10 +40,22 @@ python3 {baseDir}/scripts/bananahub.py config quickset --provider openai-compati
   --base-url "<openai-compatible base url>" --api-key "<api key>" --model gpt-image-2
 ```
 
+Agent direct-entry variant:
+```bash
+python3 {baseDir}/scripts/bananahub.py config quickset --provider openai-compatible --profile gpt --default-profile \
+  --base-url "<openai-compatible base url>" --api-key-stdin --model gpt-image-2
+```
+
 OpenAI official:
 ```bash
 python3 {baseDir}/scripts/bananahub.py config quickset --provider openai --profile gpt --default-profile \
   --api-key "<openai api key>" --model gpt-image-2
+```
+
+Agent direct-entry variant:
+```bash
+python3 {baseDir}/scripts/bananahub.py config quickset --provider openai --profile gpt --default-profile \
+  --api-key-stdin --model gpt-image-2
 ```
 
 Google AI Studio:
@@ -51,10 +64,22 @@ python3 {baseDir}/scripts/bananahub.py config quickset --provider google-ai-stud
   --api-key "<google api key>" --model gemini-3-pro-image-preview
 ```
 
+Agent direct-entry variant:
+```bash
+python3 {baseDir}/scripts/bananahub.py config quickset --provider google-ai-studio --profile nano --default-profile \
+  --api-key-stdin --model gemini-3-pro-image-preview
+```
+
 Gemini-compatible gateway:
 ```bash
 python3 {baseDir}/scripts/bananahub.py config quickset --provider gemini-compatible --profile nano --default-profile \
   --base-url "<gemini-compatible base url>" --api-key "<api key>" --model gemini-3-pro-image-preview
+```
+
+Agent direct-entry variant:
+```bash
+python3 {baseDir}/scripts/bananahub.py config quickset --provider gemini-compatible --profile nano --default-profile \
+  --base-url "<gemini-compatible base url>" --api-key-stdin --model gemini-3-pro-image-preview
 ```
 
 Vertex AI ADC:
@@ -68,6 +93,42 @@ ChatGPT-compatible endpoint:
 python3 {baseDir}/scripts/bananahub.py config quickset --provider chatgpt-compatible --profile chat --default-profile \
   --base-url "<chat endpoint>" --api-key "<api key>" --model gpt-5.4
 ```
+
+Agent direct-entry variant:
+```bash
+python3 {baseDir}/scripts/bananahub.py config quickset --provider chatgpt-compatible --profile chat --default-profile \
+  --base-url "<chat endpoint>" --api-key-stdin --model gpt-5.4
+```
+
+## Profile Config Contract
+
+`config quickset` writes `~/.config/bananahub/config.json`. Prefer named profiles so users can switch API keys, endpoints, and models later without rebuilding setup.
+
+```json
+{
+  "default_profile": "gpt",
+  "profiles": {
+    "gpt": {
+      "provider": "openai-compatible",
+      "openai_base_url": "https://example.com/v1",
+      "openai_api_key": "<persisted secret>",
+      "model": "gpt-image-2"
+    },
+    "nano": {
+      "provider": "google-ai-studio",
+      "api_key": "<persisted secret>",
+      "model": "gemini-3-pro-image-preview"
+    }
+  }
+}
+```
+
+Default profile names:
+
+- `gpt`: `openai-compatible` or `openai`
+- `nano`: `google-ai-studio` or `gemini-compatible`
+- `vertex`: `vertex-ai`
+- `chat`: `chatgpt-compatible`
 
 ## Diagnosis Contract
 
@@ -84,6 +145,9 @@ python3 {baseDir}/scripts/bananahub.py config quickset --provider chatgpt-compat
 - `requires_user_secret`: true when the next step needs an API key
 - `safe_to_autofix`: fields the agent may fill without seeing a secret
 - `suggested_commands`: concrete next command(s)
+- `suggested_commands_stdin`: variants that read API keys from stdin for direct agent entry
+- `config_path`: persistent config file path, usually `~/.config/bananahub/config.json`
+- `secret_entry_modes`: supported direct-entry, placeholder-command, and human-terminal fallback modes
 - `agent_notes`: safety and quota reminders
 
 Agent behavior:
@@ -91,7 +155,7 @@ Agent behavior:
 - If `status=ok`, do not rerun setup; proceed to prompt optimization or generation.
 - If `ignored_config_sources` is non-empty, do not ask the user about it unless it explains a failure.
 - If only `base_url` is missing for the default `openai-compatible` path, ask for the endpoint URL or provide the quickset command with `<openai-compatible base url>`.
-- If `requires_user_secret=true`, never ask for the secret in chat; direct the user to `init --wizard` or a local quickset command.
+- If `requires_user_secret=true`, ask whether the user wants direct agent entry or a local placeholder command, then persist with `config quickset --api-key-stdin` when the agent receives the key.
 
 ## Validation Checklist
 

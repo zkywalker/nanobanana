@@ -260,6 +260,35 @@ def _normalize_catalog_source(value):
     return normalized
 
 
+def _read_api_key_stdin():
+    """Read an API key from stdin for non-interactive agents."""
+    if sys.stdin.isatty():
+        raise ValueError("--api-key-stdin requires API key content on stdin")
+    value = sys.stdin.read().strip()
+    if not value:
+        raise ValueError("--api-key-stdin did not receive an API key")
+    if "\n" in value:
+        value = value.splitlines()[0].strip()
+    if not value:
+        raise ValueError("--api-key-stdin did not receive an API key")
+    return value
+
+
+def _resolve_api_key_input(args):
+    """Resolve API-key input from argv or stdin."""
+    api_key = getattr(args, "api_key", None)
+    if getattr(args, "api_key_stdin", False):
+        if api_key:
+            raise ValueError("Use either --api-key or --api-key-stdin, not both")
+        return _read_api_key_stdin()
+    return api_key
+
+
+def _api_key_stdin_variant(command):
+    """Return a command variant that reads the API key from stdin."""
+    return re.sub(r"--api-key\s+<[^>]+>", "--api-key-stdin", command)
+
+
 def _normalize_telemetry_event(value):
     """Validate telemetry event names accepted by the Hub API."""
     normalized = str(value or "").strip().lower()
@@ -862,7 +891,7 @@ def _build_init_checks(config, resolved_from, config_sources, explicit_resolved_
         "ok": bool(actual_sources),
         "sources": actual_sources,
         "preferred_path": str(SKILL_CONFIG_PATH),
-        **({} if actual_sources else {"error": f"No config found. Create {SKILL_CONFIG_PATH}, run init --wizard, or use environment variables."}),
+        **({} if actual_sources else {"error": f"No config found. Create {SKILL_CONFIG_PATH} with config quickset, or use environment variables."}),
     })
 
     runtime_support = _runtime_support_status(config)
@@ -943,8 +972,15 @@ def _build_init_checks(config, resolved_from, config_sources, explicit_resolved_
 def _init_setup_guide(diagnosis=None):
     diagnosis = diagnosis or {}
     return {
-        "summary": "Run the guided setup. GPT Image 2 is the recommended default; choose another provider only if that is the image channel you already use.",
-        "recommended": "python3 scripts/bananahub.py init --wizard",
+        "summary": "Connect an image API by persisting a provider profile. GPT Image 2 is the recommended default; choose another provider only if that is the image channel you already use.",
+        "recommended": "Ask the user for the provider-required fields, then run the matching config quickset command.",
+        "human_terminal_fallback": "python3 scripts/bananahub.py init --wizard",
+        "config_path": str(SKILL_CONFIG_PATH),
+        "secret_entry_modes": [
+            "direct_agent_entry_when_user_explicitly_allows",
+            "local_quickset_command_with_placeholders",
+            "human_terminal_init_wizard",
+        ],
         "default_provider": DEFAULT_PROVIDER,
         "default_model": DEFAULT_MODEL,
         "commands": [
@@ -956,7 +992,10 @@ def _init_setup_guide(diagnosis=None):
         ],
         "agent_notes": diagnosis.get("agent_notes") or [
             "Ask which provider/channel the user already has before asking for credentials.",
-            "Do not ask the user to paste real API keys into chat; use the local wizard or a shell command.",
+            "Agents should use config quickset for non-interactive profile persistence.",
+            "If the user chooses direct entry or already pasted a key, write it with config quickset and do not echo it back.",
+            "If the user does not want secrets in chat, provide the quickset command with placeholders for their local terminal.",
+            "Use init --wizard only as a human-terminal fallback.",
         ],
     }
 
@@ -1031,7 +1070,11 @@ def _run_init_wizard(args):
 
     profile = getattr(args, "profile", None) or _default_profile_for_provider(provider)
     base_url = getattr(args, "base_url", None)
-    api_key = getattr(args, "api_key", None)
+    try:
+        api_key = _resolve_api_key_input(args)
+    except ValueError as exc:
+        print(json.dumps({"status": "error", "error": str(exc)}, ensure_ascii=False))
+        sys.exit(1)
     project = getattr(args, "project", None)
     location = getattr(args, "location", None)
     model = getattr(args, "model", None) or _provider_default_model(provider)
@@ -1116,7 +1159,13 @@ def _run_init_wizard(args):
 
 def cmd_init(args):
     """Check environment readiness and guide user through setup."""
-    if getattr(args, "wizard", False) or getattr(args, "provider", None) or getattr(args, "api_key", None) or getattr(args, "base_url", None):
+    if (
+        getattr(args, "wizard", False)
+        or getattr(args, "provider", None)
+        or getattr(args, "api_key", None)
+        or getattr(args, "api_key_stdin", False)
+        or getattr(args, "base_url", None)
+    ):
         _run_init_wizard(args)
         return
 
@@ -1157,7 +1206,7 @@ def cmd_init(args):
         if not all_ok:
             print("\nNext step:")
             print(response["setup_guide"]["recommended"])
-            print("Or run:")
+            print("Suggested command:")
             print(response["diagnosis"]["suggested_commands"][0])
     if not all_ok:
         sys.exit(1)
@@ -1420,8 +1469,14 @@ def _save_config_update_or_exit(persisted_config, target_config, profile=None):
 
 def cmd_config_set(args):
     """Persist BananaHub config under ~/.config/bananahub/config.json."""
+    try:
+        api_key = _resolve_api_key_input(args)
+    except ValueError as exc:
+        print(json.dumps({"status": "error", "error": str(exc)}, ensure_ascii=False))
+        sys.exit(1)
+
     if (
-        not args.api_key
+        not api_key
         and not args.profile
         and not args.default_profile
         and not args.provider
@@ -1446,7 +1501,7 @@ def cmd_config_set(args):
         target_config = _apply_config_updates(
             persisted_config,
             provider=args.provider,
-            api_key=args.api_key,
+            api_key=api_key,
             base_url=args.base_url,
             model=args.model,
             auth_mode=args.auth_mode,
@@ -1471,6 +1526,7 @@ def cmd_config_quickset(args):
     try:
         provider = _normalize_provider(args.provider)
         auth_mode = _normalize_auth_mode(args.auth_mode) if args.auth_mode else AUTH_MODE_API_KEY
+        api_key = _resolve_api_key_input(args)
     except ValueError as exc:
         print(json.dumps({"status": "error", "error": str(exc)}, ensure_ascii=False))
         sys.exit(1)
@@ -1479,8 +1535,8 @@ def cmd_config_quickset(args):
     missing = []
     if "base_url" in required and not args.base_url:
         missing.append("--base-url")
-    if "api_key" in required and not args.api_key:
-        missing.append("--api-key")
+    if "api_key" in required and not api_key:
+        missing.append("--api-key or --api-key-stdin")
     if "project" in required and not args.project:
         missing.append("--project")
     if "location" in required and not args.location:
@@ -1502,7 +1558,7 @@ def cmd_config_quickset(args):
         target_config = _apply_config_updates(
             persisted_config,
             provider=provider,
-            api_key=args.api_key,
+            api_key=api_key,
             base_url=args.base_url,
             model=model,
             auth_mode=auth_mode,
@@ -1618,10 +1674,19 @@ def _diagnose_config_state(config, resolved_from=None, config_sources=None, expl
         "requires_user_secret": requires_user_secret,
         "safe_to_autofix": safe_to_autofix,
         "suggested_commands": suggested_commands,
+        "suggested_commands_stdin": [_api_key_stdin_variant(command) for command in suggested_commands],
         "manual_init": "python3 scripts/bananahub.py init --wizard",
+        "config_path": str(SKILL_CONFIG_PATH),
+        "secret_entry_modes": [
+            "direct_agent_entry_when_user_explicitly_allows",
+            "local_quickset_command_with_placeholders",
+            "human_terminal_init_wizard",
+        ],
         "agent_notes": [
-            "Never ask the user to paste real API keys into chat; prefer the local init wizard or a terminal command.",
-            "Use config quickset for one-command setup when the user already knows provider/base_url/model.",
+            "Agents should not assume interactive TTY prompts are available; use config quickset for non-interactive profile persistence.",
+            "If the user chooses direct entry or already pasted a key, write it with config quickset --api-key-stdin and do not echo it back.",
+            "If the user does not want secrets in chat, provide the quickset command with placeholders for their local terminal.",
+            "Use init --wizard only as a human-terminal fallback.",
             "GPT Image 2 is the recommended default model; preserve an explicit provider/model the user already configured.",
             "Treat ignored_config_sources as informational only; they are not active for this provider.",
             "Install missing dependencies locally before attempting provider calls.",
@@ -3036,7 +3101,8 @@ def main():
     init_parser.add_argument("--install-deps", action="store_true", help="Install missing Python dependencies for the selected provider")
     init_parser.add_argument("--provider", choices=sorted(SUPPORTED_PROVIDERS), help="Provider to configure in wizard/non-interactive init")
     init_parser.add_argument("--profile", help="Named profile to create or update")
-    init_parser.add_argument("--api-key", help="API key to persist; prefer interactive wizard for hidden input")
+    init_parser.add_argument("--api-key", help="API key to persist; prefer --api-key-stdin for agent direct entry")
+    init_parser.add_argument("--api-key-stdin", action="store_true", help="Read API key to persist from stdin")
     init_parser.add_argument("--base-url", help="Gateway base URL for compatible providers")
     init_parser.add_argument("--model", help="Default model to persist")
     init_parser.add_argument("--auth-mode", choices=sorted(SUPPORTED_AUTH_MODES), help="Auth mode for Vertex AI or compatible providers")
@@ -3060,6 +3126,7 @@ def main():
     config_quickset_parser.add_argument("--profile", help="Named provider profile to update")
     config_quickset_parser.add_argument("--default-profile", action="store_true", help="Make this profile the default")
     config_quickset_parser.add_argument("--api-key", help="API key to persist")
+    config_quickset_parser.add_argument("--api-key-stdin", action="store_true", help="Read API key to persist from stdin")
     config_quickset_parser.add_argument("--base-url", help="Gateway base URL for compatible providers")
     config_quickset_parser.add_argument("--model", help="Default model to persist")
     config_quickset_parser.add_argument("--auth-mode", choices=sorted(SUPPORTED_AUTH_MODES), help="Auth mode to persist: api_key or adc")
@@ -3081,6 +3148,7 @@ def main():
     config_set_parser.add_argument("--profile", help="Named provider profile to update")
     config_set_parser.add_argument("--default-profile", help="Persist the default named provider profile")
     config_set_parser.add_argument("--api-key", help="API key to persist in BananaHub config or selected profile")
+    config_set_parser.add_argument("--api-key-stdin", action="store_true", help="Read API key to persist from stdin")
     config_set_parser.add_argument("--base-url", help="Custom Gemini-compatible base URL to persist")
     config_set_parser.add_argument("--project", help="Google Cloud project to persist")
     config_set_parser.add_argument("--location", help="Google Cloud location to persist")

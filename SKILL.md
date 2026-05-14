@@ -75,12 +75,12 @@ Generate or edit provider-backed images from non-English or mixed-language reque
   4. Persistent config helpers:
      - `python3 {baseDir}/scripts/bananahub.py config show`
      - `python3 {baseDir}/scripts/bananahub.py config doctor --json`
-     - `python3 {baseDir}/scripts/bananahub.py init --wizard`
-     - `python3 {baseDir}/scripts/bananahub.py init --wizard --install-deps`
      - `python3 {baseDir}/scripts/bananahub.py config quickset --provider openai-compatible --profile gpt --default-profile --base-url https://your-openai-compatible-endpoint --api-key <key> --model gpt-image-2`
+     - `python3 {baseDir}/scripts/bananahub.py config quickset --provider openai-compatible --profile gpt --default-profile --base-url https://your-openai-compatible-endpoint --api-key-stdin --model gpt-image-2`
      - `python3 {baseDir}/scripts/bananahub.py config quickset --provider openai --profile gpt --default-profile --api-key <key> --model gpt-image-2`
      - `python3 {baseDir}/scripts/bananahub.py config quickset --provider google-ai-studio --profile nano --default-profile --api-key <key> --model gemini-3-pro-image-preview`
      - `python3 {baseDir}/scripts/bananahub.py config quickset --provider vertex-ai --profile vertex --default-profile --auth-mode adc --project <gcp-project> --location global`
+     - `python3 {baseDir}/scripts/bananahub.py init --wizard` (human-terminal fallback only)
      - `python3 {baseDir}/scripts/bananahub.py config set --clear-base-url`
 - **Output directory**: current working directory (where the skill is invoked)
 
@@ -88,20 +88,22 @@ Generate or edit provider-backed images from non-English or mixed-language reque
 
 Before executing any command other than `help`, check if the environment is ready:
 1. Run `python3 {baseDir}/scripts/bananahub.py config doctor --json` when setup status is unclear.
-2. If `status` is `needs_setup`, read `references/init-guide.md` and either run `init --wizard`, run `init --wizard --install-deps` when dependencies are missing, or offer the `suggested_commands[0]` quickset command.
-3. Never ask the user to paste real API keys into chat; prefer the local wizard or a terminal command with `<key>` placeholder.
-4. If config exists but generation fails with auth/dependency errors → suggest `config doctor --json` or `init --wizard`.
-5. Persist new config into `~/.config/bananahub/config.json`, preferably as a named profile (`gpt`, `nano`, `vertex`, or `chat`).
-6. Treat `openai-compatible` + `gpt-image-2` as the default setup path. If the user already configured a provider/profile/model, preserve it and route within that provider.
-7. Supported runtime providers:
+2. If `status` is `needs_setup`, read `references/init-guide.md`, ask only for missing provider-required fields, then persist them with the matching `config quickset` command.
+3. Direct API-key entry is allowed when the user chooses it or already pasted a key. Write it with `config quickset --api-key-stdin` and do not echo it back.
+4. If the user does not want secrets in chat, give them the `config quickset` command with `<key>` placeholders for their local terminal.
+5. If config exists but generation fails with auth/dependency errors → suggest `config doctor --json`.
+6. Persist new config into `~/.config/bananahub/config.json`, preferably as a named profile (`gpt`, `nano`, `vertex`, or `chat`).
+7. Treat `init --wizard` as a human-terminal fallback only; do not assume agents can run interactive prompts.
+8. Treat `openai-compatible` + `gpt-image-2` as the default setup path. If the user already configured a provider/profile/model, preserve it and route within that provider.
+9. Supported runtime providers:
    - `google-ai-studio`: generate / edit / models / init
    - `gemini-compatible`: generate / edit / models / init
    - `vertex-ai`: generate / edit / models / init
    - `openai`: OpenAI-native GPT Image generate / edit / models / init
    - `openai-compatible`: OpenAI-style Images API generate / edit / models / init, capability-dependent
    - `chatgpt-compatible`: chat/completions endpoint that returns images inside assistant replies
-8. `openai-compatible` is not the same as OpenAI-native GPT Image. The runtime attempts standard Images API generation/editing, but exact support still depends on the gateway.
-9. Endpoint normalization rules:
+10. `openai-compatible` is not the same as OpenAI-native GPT Image. The runtime attempts standard Images API generation/editing, but exact support still depends on the gateway.
+11. Endpoint normalization rules:
    - `gemini-compatible`: if the user pastes a URL ending in `/v1beta`, keep it conceptually but normalize the trailing version during runtime so it is not duplicated
    - `openai-compatible`: if the user pastes a bare host, the runtime may append `/v1`; for Google's official endpoint, resolve it to `/v1beta/openai`
 

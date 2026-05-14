@@ -128,12 +128,7 @@ BananaHub supports several provider routes. Advanced capabilities are not assume
 Setup examples:
 
 ```bash
-# Beginner-friendly interactive setup
-python3 scripts/bananahub.py init --wizard
-# Optionally repair missing Python packages too
-python3 scripts/bananahub.py init --wizard --install-deps
-
-# Agent/script-readable diagnosis
+# Agent/script-readable diagnosis before provider calls
 python3 scripts/bananahub.py config doctor --json
 
 # Recommended GPT Image gateway profile
@@ -159,8 +154,13 @@ python3 scripts/bananahub.py config quickset --provider chatgpt-compatible --pro
 # Vertex AI ADC profile
 python3 scripts/bananahub.py config quickset --provider vertex-ai --profile vertex --default-profile \
   --auth-mode adc --project <gcp-project> --location global
+
+# Human-terminal fallback when you want guided prompts
+python3 scripts/bananahub.py init --wizard
 ```
 
+Agents should use `config doctor --json`, collect only missing provider fields, and persist them with `config quickset`. Direct API-key entry is supported when the user chooses it; otherwise provide a quickset command with placeholders for the user's local terminal.
+When an agent receives the key directly, prefer `--api-key-stdin` over `--api-key` so the secret is not placed in command arguments.
 
 Manual validation for an OpenAI-compatible `gpt-image-2` gateway:
 

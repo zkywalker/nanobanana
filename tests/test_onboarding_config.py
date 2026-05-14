@@ -111,7 +111,29 @@ def test_doctor_reports_missing_secret_and_agent_contract():
     assert diagnosis["active_api_key"]["config_key"] == "OPENAI_API_KEY"
     assert "api_key" in diagnosis["missing_fields"]
     assert "config quickset --provider openai-compatible" in diagnosis["suggested_commands"][0]
+    assert "--api-key-stdin" in diagnosis["suggested_commands_stdin"][0]
     assert "gpt-image-2" in diagnosis["suggested_commands"][0]
+    assert diagnosis["config_path"].endswith(".config/bananahub/config.json")
+    assert "direct_agent_entry_when_user_explicitly_allows" in diagnosis["secret_entry_modes"]
+    assert any("config quickset --api-key-stdin" in note for note in diagnosis["agent_notes"])
+    assert any("interactive TTY" in note for note in diagnosis["agent_notes"])
+
+
+def test_quickset_can_read_api_key_from_stdin():
+    with TempHome() as config_path:
+        old_stdin = sys.stdin
+        try:
+            sys.stdin = StringIO("stdin-key\n")
+            args = quickset_args(api_key=None, api_key_stdin=True)
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                bananahub.cmd_config_quickset(args)
+        finally:
+            sys.stdin = old_stdin
+
+        raw = json.loads(config_path.read_text())
+
+    assert raw["profiles"]["gpt"]["openai_api_key"] == "stdin-key"
 
 
 def test_doctor_scopes_resolved_from_to_active_provider():
@@ -173,6 +195,7 @@ if __name__ == "__main__":
     test_quickset_openai_compatible_writes_gpt_profile()
     test_quickset_defaults_openai_compatible_to_gpt_image_2()
     test_doctor_reports_missing_secret_and_agent_contract()
+    test_quickset_can_read_api_key_from_stdin()
     test_doctor_scopes_resolved_from_to_active_provider()
     test_dependency_status_is_provider_aware()
     test_dependency_install_command_uses_current_python_user_site()

@@ -128,12 +128,7 @@ BananaHub 支持多条接入路径。高级能力不要跨 provider 猜测，实
 配置示例：
 
 ```bash
-# 面向新手的交互式初始化
-python3 scripts/bananahub.py init --wizard
-# 也可以顺手安装缺失的 Python 依赖
-python3 scripts/bananahub.py init --wizard --install-deps
-
-# 面向 agent / 脚本的配置诊断
+# 面向 agent / 脚本的配置诊断，provider 调用前先跑
 python3 scripts/bananahub.py config doctor --json
 
 # 推荐的 GPT Image 网关 profile
@@ -159,8 +154,13 @@ python3 scripts/bananahub.py config quickset --provider chatgpt-compatible --pro
 # Vertex AI ADC profile
 python3 scripts/bananahub.py config quickset --provider vertex-ai --profile vertex --default-profile \
   --auth-mode adc --project <gcp-project> --location global
+
+# 用户想要本地引导时的终端 fallback
+python3 scripts/bananahub.py init --wizard
 ```
 
+Agent 应该使用 `config doctor --json`，只收集缺失的 provider 字段，然后用 `config quickset` 持久化。用户选择直接提供 AK 时可以由 agent 写入；否则给用户一条带占位符的 quickset 命令，让用户在本地终端执行。
+当 agent 直接收到 AK 时，优先使用 `--api-key-stdin`，避免把密钥放进命令行参数。
 
 OpenAI-compatible `gpt-image-2` 网关手动验证：
 
