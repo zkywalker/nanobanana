@@ -98,7 +98,6 @@ def http_multipart_request(method, url, headers=None, fields=None, files=None, t
     body.extend(f"--{boundary}--\r\n".encode("utf-8"))
     request_headers = dict(headers or {})
     request_headers["Content-Type"] = f"multipart/form-data; boundary={boundary}"
-    request_headers.setdefault("Accept", "application/json")
     req = urlrequest.Request(url, data=bytes(body), headers=request_headers, method=method.upper())
     try:
         with urlrequest.urlopen(req, timeout=timeout) as resp:

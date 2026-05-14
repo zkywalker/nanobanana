@@ -42,6 +42,8 @@ def build_generate_args(**overrides):
         "output_format": None,
         "output_compression": None,
         "moderation": None,
+        "response_format": None,
+        "timeout": None,
         "user": None,
         "template_id": None,
         "template_repo": None,

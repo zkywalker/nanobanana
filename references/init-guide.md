@@ -17,6 +17,8 @@ python3 {baseDir}/scripts/bananahub.py init --wizard --install-deps
    ```
 4. If the user already knows their provider/base URL/model, use `config quickset` instead of walking them through manual JSON edits.
 5. Do not run a paid image-generation test unless the user explicitly agrees. Model-list healthchecks are okay; generation smoke tests require consent.
+6. Default to GPT Image 2 through `openai-compatible` unless the user explicitly chooses another image channel or an existing config already resolves cleanly.
+7. Do not ask the user to interpret `resolved_from`, provider aliases, or ignored env vars. Use `effective_config`, `missing_fields`, and `ignored_config_sources` yourself and only surface the next action.
 
 ## Provider Selection
 
@@ -74,6 +76,8 @@ python3 {baseDir}/scripts/bananahub.py config quickset --provider chatgpt-compat
 - `status`: `ok` or `needs_setup`
 - `provider` / `provider_label`
 - `effective_config`: masked key, base URL, model, endpoint resolution, capabilities
+- `resolved_from`: source of the active provider-scoped values only
+- `ignored_config_sources`: configured env/profile values that are inactive for the selected provider
 - `missing_fields`: `api_key`, `base_url`, `project`, `location`, etc.
 - `missing_dependencies`: Python packages needed for the selected provider
 - `dependency_install_command`: safe local command for installing missing Python packages
@@ -81,6 +85,13 @@ python3 {baseDir}/scripts/bananahub.py config quickset --provider chatgpt-compat
 - `safe_to_autofix`: fields the agent may fill without seeing a secret
 - `suggested_commands`: concrete next command(s)
 - `agent_notes`: safety and quota reminders
+
+Agent behavior:
+
+- If `status=ok`, do not rerun setup; proceed to prompt optimization or generation.
+- If `ignored_config_sources` is non-empty, do not ask the user about it unless it explains a failure.
+- If only `base_url` is missing for the default `openai-compatible` path, ask for the endpoint URL or provide the quickset command with `<openai-compatible base url>`.
+- If `requires_user_secret=true`, never ask for the secret in chat; direct the user to `init --wizard` or a local quickset command.
 
 ## Validation Checklist
 

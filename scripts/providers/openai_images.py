@@ -1,8 +1,27 @@
 """OpenAI Images API and OpenAI-compatible image adapter."""
 
 import base64
+import os
 
 from .common import http_fetch_bytes, http_json_request, http_multipart_request, join_endpoint
+
+DEFAULT_IMAGE_TIMEOUT_SECONDS = 900
+
+
+def request_timeout(config=None, override=None, default=DEFAULT_IMAGE_TIMEOUT_SECONDS):
+    if override is not None:
+        try:
+            return max(1, int(override))
+        except (TypeError, ValueError):
+            return default
+    configured = (config or {}).get("BANANAHUB_IMAGE_TIMEOUT") or os.environ.get("BANANAHUB_IMAGE_TIMEOUT")
+    if not configured:
+        return default
+    try:
+        timeout = int(configured)
+    except (TypeError, ValueError):
+        return default
+    return max(1, timeout)
 
 
 def is_gpt_image_model(model):
@@ -11,7 +30,7 @@ def is_gpt_image_model(model):
 
 def auth_headers(config, provider_openai="openai", default_provider="google-ai-studio"):
     provider = config.get("BANANAHUB_PROVIDER", default_provider)
-    api_key = config.get("OPENAI_API_KEY", "") if provider == provider_openai else config.get("GEMINI_API_KEY", "")
+    api_key = config.get("OPENAI_API_KEY", "") if provider == provider_openai else config.get("OPENAI_API_KEY") or config.get("GEMINI_API_KEY", "")
     return {"Authorization": f"Bearer {api_key}"}
 
 
@@ -36,16 +55,16 @@ def build_generation_payload(
     n=None,
     moderation=None,
     user=None,
+    response_format=None,
     provider=None,
 ):
     is_openai_compatible = provider == "openai-compatible"
-    is_gpt_image = is_gpt_image_model(model)
     payload = {
         "model": model,
         "prompt": prompt,
     }
-    if not is_openai_compatible and not is_gpt_image:
-        payload["response_format"] = "b64_json"
+    if response_format:
+        payload["response_format"] = response_format
     warnings = []
 
     if openai_size:
@@ -171,6 +190,8 @@ def try_generate(
     n=None,
     moderation=None,
     user=None,
+    response_format=None,
+    timeout=None,
     provider_openai="openai",
     default_provider="google-ai-studio",
 ):
@@ -188,6 +209,7 @@ def try_generate(
         n=n,
         moderation=moderation,
         user=user,
+        response_format=response_format,
         provider=provider,
     )
     endpoint_resolution = resolve_endpoint(provider_base_url(config))
@@ -197,7 +219,7 @@ def try_generate(
         join_endpoint(endpoint_resolution["resolved_base_url"], "images/generations"),
         headers=headers(config, provider_openai=provider_openai, default_provider=default_provider),
         payload=payload,
-        timeout=120,
+        timeout=request_timeout(config, override=timeout),
     )
     images, error = extract_images(response)
     return images, warnings, error
@@ -215,13 +237,14 @@ def build_edit_fields(
     moderation=None,
     input_fidelity=None,
     user=None,
+    response_format=None,
 ):
     fields = {
         "model": model,
         "prompt": prompt,
     }
-    if not is_gpt_image_model(model):
-        fields["response_format"] = "b64_json"
+    if response_format:
+        fields["response_format"] = response_format
     if size:
         fields["size"] = size
     if quality:
@@ -269,6 +292,8 @@ def try_edit(
     moderation=None,
     input_fidelity=None,
     user=None,
+    response_format=None,
+    timeout=None,
     provider_openai="openai",
     default_provider="google-ai-studio",
 ):
@@ -289,6 +314,7 @@ def try_edit(
         moderation=moderation,
         input_fidelity=input_fidelity,
         user=user,
+        response_format=response_format,
     )
     files = build_edit_files(input_path, ref_paths=ref_paths, mask_path=mask_path)
     response = http_multipart_request(
@@ -297,7 +323,7 @@ def try_edit(
         headers=auth_headers(config, provider_openai=provider_openai, default_provider=default_provider),
         fields=fields,
         files=files,
-        timeout=120,
+        timeout=request_timeout(config, override=timeout),
     )
     images, error = extract_images(response)
     return images, warnings, error

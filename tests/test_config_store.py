@@ -59,6 +59,77 @@ def test_openai_compatible_exposes_images_api_edit_capabilities():
     assert support["capabilities"]["mask_edit"] is True
 
 
+def test_empty_config_defaults_to_openai_compatible_gpt_path():
+    config = {}
+    resolved = {}
+    config_store.finalize_config(config, resolved)
+
+    assert config["BANANAHUB_PROVIDER"] == "openai-compatible"
+    assert config["BANANAHUB_TRANSPORT"] == "openai-rest"
+    assert resolved["BANANAHUB_PROVIDER"] == "default"
+
+
+def test_openai_base_url_infers_openai_compatible_provider():
+    config = {"OPENAI_BASE_URL": "https://gateway.example/v1", "OPENAI_API_KEY": "k"}
+    resolved = {"OPENAI_BASE_URL": "env:OPENAI_BASE_URL", "OPENAI_API_KEY": "env:OPENAI_API_KEY"}
+    config_store.finalize_config(config, resolved)
+
+    assert config["BANANAHUB_PROVIDER"] == "openai-compatible"
+    assert resolved["BANANAHUB_PROVIDER"] == "inferred:OPENAI_BASE_URL"
+
+
+def test_existing_gemini_key_keeps_google_ai_studio_provider():
+    config = {"GEMINI_API_KEY": "k"}
+    resolved = {"GEMINI_API_KEY": "config.json"}
+    config_store.finalize_config(config, resolved)
+
+    assert config["BANANAHUB_PROVIDER"] == "google-ai-studio"
+    assert resolved["BANANAHUB_PROVIDER"] == "inferred:GEMINI_API_KEY"
+
+
+def test_openai_compatible_accepts_openai_api_key():
+    config = {
+        "BANANAHUB_PROVIDER": "openai-compatible",
+        "BANANAHUB_TRANSPORT": "openai-rest",
+        "BANANAHUB_AUTH_MODE": "api_key",
+        "OPENAI_API_KEY": "k",
+        "OPENAI_BASE_URL": "https://gateway.example/v1",
+    }
+
+    assert config_store.config_validation_errors(config) == []
+
+
+def test_resolved_from_is_provider_scoped_and_ignored_sources_are_explicit():
+    config = {
+        "BANANAHUB_PROVIDER": "google-ai-studio",
+        "BANANAHUB_TRANSPORT": "genai",
+        "BANANAHUB_AUTH_MODE": "api_key",
+        "GEMINI_API_KEY": "gemini-key",
+        "BANANAHUB_CHATGPT_API_KEY": "chat-key",
+        "BANANAHUB_CHATGPT_BASE_URL": "https://chat.example/v1",
+    }
+    resolved = {
+        "BANANAHUB_PROVIDER": "config.json",
+        "BANANAHUB_TRANSPORT": "default:google-ai-studio",
+        "BANANAHUB_AUTH_MODE": "default:google-ai-studio",
+        "GEMINI_API_KEY": "config.json",
+        "BANANAHUB_CHATGPT_API_KEY": "env:BANANAHUB_CHATGPT_API_KEY",
+        "BANANAHUB_CHATGPT_BASE_URL": "env:BANANAHUB_CHATGPT_BASE_URL",
+    }
+
+    serialized = config_store.serialize_resolved_from(config, resolved)
+    ignored = config_store.inactive_config_sources(config, resolved)
+
+    assert serialized["api_key"] == "config.json"
+    assert serialized["base_url"] is None
+    assert {
+        "field": "chatgpt_base_url",
+        "internal_key": "BANANAHUB_CHATGPT_BASE_URL",
+        "source": "env:BANANAHUB_CHATGPT_BASE_URL",
+        "reason": "inactive for selected provider",
+    } in ignored
+
+
 def test_command_provider_override():
     config = {"BANANAHUB_PROVIDER": "google-ai-studio", "BANANAHUB_TRANSPORT": "genai"}
     updated = config_store.apply_command_provider_override(config, "openai")
@@ -111,6 +182,11 @@ if __name__ == "__main__":
     test_profile_merge()
     test_chatgpt_inference_and_validation()
     test_openai_compatible_exposes_images_api_edit_capabilities()
+    test_empty_config_defaults_to_openai_compatible_gpt_path()
+    test_openai_base_url_infers_openai_compatible_provider()
+    test_existing_gemini_key_keeps_google_ai_studio_provider()
+    test_openai_compatible_accepts_openai_api_key()
+    test_resolved_from_is_provider_scoped_and_ignored_sources_are_explicit()
     test_command_provider_override()
     test_persisted_config_roundtrip()
     print("ok")

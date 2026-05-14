@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import base64
 import importlib.util
+import os
 import sys
 from pathlib import Path
 
@@ -118,7 +119,77 @@ def test_try_generate_posts_to_images_generations():
     assert calls[0]["url"] == "https://api.openai.com/v1/images/generations"
     assert calls[0]["headers"]["Authorization"] == "Bearer test-key"
     assert calls[0]["payload"]["size"] == "1024x1024"
-    assert calls[0]["timeout"] == 120
+    assert "response_format" not in calls[0]["payload"]
+    assert calls[0]["timeout"] == 900
+
+
+def test_try_generate_allows_timeout_override():
+    calls = []
+    image_bytes = b"fake-png"
+    encoded = base64.b64encode(image_bytes).decode("ascii")
+
+    def fake_http_json_request(method, url, headers, payload=None, timeout=None):
+        calls.append({"timeout": timeout})
+        return {"data": [{"b64_json": encoded}]}
+
+    original_request = openai_images.http_json_request
+    original_timeout = os.environ.get("BANANAHUB_IMAGE_TIMEOUT")
+    openai_images.http_json_request = fake_http_json_request
+    os.environ["BANANAHUB_IMAGE_TIMEOUT"] = "42"
+    try:
+        result, warnings, error = openai_images.try_generate(
+            {"BANANAHUB_PROVIDER": "openai", "OPENAI_API_KEY": "test-key"},
+            "gpt-image-2",
+            "draw a precise icon",
+            "1:1",
+            openai_images.resolve_openai_endpoint_for_test,
+        )
+    finally:
+        openai_images.http_json_request = original_request
+        if original_timeout is None:
+            os.environ.pop("BANANAHUB_IMAGE_TIMEOUT", None)
+        else:
+            os.environ["BANANAHUB_IMAGE_TIMEOUT"] = original_timeout
+
+    assert result == [image_bytes]
+    assert warnings == []
+    assert error is None
+    assert calls[0]["timeout"] == 42
+
+
+def test_try_generate_prefers_call_timeout_over_env():
+    calls = []
+    image_bytes = b"fake-png"
+    encoded = base64.b64encode(image_bytes).decode("ascii")
+
+    def fake_http_json_request(method, url, headers, payload=None, timeout=None):
+        calls.append({"timeout": timeout})
+        return {"data": [{"b64_json": encoded}]}
+
+    original_request = openai_images.http_json_request
+    original_timeout = os.environ.get("BANANAHUB_IMAGE_TIMEOUT")
+    openai_images.http_json_request = fake_http_json_request
+    os.environ["BANANAHUB_IMAGE_TIMEOUT"] = "42"
+    try:
+        result, warnings, error = openai_images.try_generate(
+            {"BANANAHUB_PROVIDER": "openai", "OPENAI_API_KEY": "test-key"},
+            "gpt-image-2",
+            "draw a precise icon",
+            "1:1",
+            openai_images.resolve_openai_endpoint_for_test,
+            timeout=77,
+        )
+    finally:
+        openai_images.http_json_request = original_request
+        if original_timeout is None:
+            os.environ.pop("BANANAHUB_IMAGE_TIMEOUT", None)
+        else:
+            os.environ["BANANAHUB_IMAGE_TIMEOUT"] = original_timeout
+
+    assert result == [image_bytes]
+    assert warnings == []
+    assert error is None
+    assert calls[0]["timeout"] == 77
 
 
 def test_try_generate_openai_compatible_uses_gateway_safe_defaults():
@@ -168,6 +239,38 @@ def test_try_generate_openai_compatible_uses_gateway_safe_defaults():
         "output_format": "png",
     }
     assert "response_format" not in calls[0]["payload"]
+
+
+def test_try_generate_openai_compatible_prefers_openai_api_key_when_available():
+    calls = []
+    encoded = base64.b64encode(b"fake-png").decode("ascii")
+
+    def fake_http_json_request(method, url, headers, payload=None, timeout=None):
+        calls.append({"headers": headers})
+        return {"data": [{"b64_json": encoded}]}
+
+    original = openai_images.http_json_request
+    openai_images.http_json_request = fake_http_json_request
+    try:
+        result, warnings, error = openai_images.try_generate(
+            {
+                "BANANAHUB_PROVIDER": "openai-compatible",
+                "OPENAI_API_KEY": "openai-compatible-key",
+                "GEMINI_API_KEY": "gemini-key",
+                "OPENAI_BASE_URL": "https://token.bigfish.space/v1",
+            },
+            "gpt-image-2",
+            "Create a tiny cute robot sticker on a plain white background.",
+            "1:1",
+            openai_images.resolve_openai_endpoint_for_test,
+        )
+    finally:
+        openai_images.http_json_request = original
+
+    assert result == [b"fake-png"]
+    assert warnings == []
+    assert error is None
+    assert calls[0]["headers"]["Authorization"] == "Bearer openai-compatible-key"
 
 
 def test_try_generate_openai_compatible_preserves_explicit_size():
@@ -272,6 +375,35 @@ def test_try_generate_returns_multiple_images():
     assert calls[0]["payload"]["n"] == 2
 
 
+def test_try_generate_preserves_explicit_response_format():
+    calls = []
+    image_bytes = b"fake-png"
+    encoded = base64.b64encode(image_bytes).decode("ascii")
+
+    def fake_http_json_request(method, url, headers, payload=None, timeout=None):
+        calls.append({"payload": payload})
+        return {"data": [{"b64_json": encoded}]}
+
+    original = openai_images.http_json_request
+    openai_images.http_json_request = fake_http_json_request
+    try:
+        result, warnings, error = openai_images.try_generate(
+            {"BANANAHUB_PROVIDER": "openai", "OPENAI_API_KEY": "test-key"},
+            "dall-e-3",
+            "draw a precise icon",
+            "1:1",
+            openai_images.resolve_openai_endpoint_for_test,
+            response_format="b64_json",
+        )
+    finally:
+        openai_images.http_json_request = original
+
+    assert result == [image_bytes]
+    assert warnings == []
+    assert error is None
+    assert calls[0]["payload"]["response_format"] == "b64_json"
+
+
 def test_try_edit_posts_multipart_with_mask_and_refs():
     calls = []
     image_bytes = b"edited"
@@ -332,9 +464,10 @@ def test_try_edit_posts_multipart_with_mask_and_refs():
         {"field": "image[]", "path": "ref.png"},
         {"field": "mask", "path": "mask.png"},
     ]
+    assert calls[0]["timeout"] == 900
 
 
-def test_try_edit_single_image_uses_plain_image_field_and_legacy_response_format():
+def test_try_edit_single_image_uses_plain_image_field_without_response_format_by_default():
     calls = []
     image_bytes = b"edited"
     encoded = base64.b64encode(image_bytes).decode("ascii")
@@ -359,8 +492,37 @@ def test_try_edit_single_image_uses_plain_image_field_and_legacy_response_format
     assert result == [image_bytes]
     assert warnings == []
     assert error is None
-    assert calls[0]["fields"]["response_format"] == "b64_json"
+    assert "response_format" not in calls[0]["fields"]
     assert calls[0]["files"] == [{"field": "image", "path": "input.png"}]
+
+
+def test_try_edit_preserves_explicit_response_format():
+    calls = []
+    image_bytes = b"edited"
+    encoded = base64.b64encode(image_bytes).decode("ascii")
+
+    def fake_http_multipart_request(method, url, headers, fields, files, timeout=None):
+        calls.append({"fields": fields, "files": files})
+        return {"data": [{"b64_json": encoded}]}
+
+    original = openai_images.http_multipart_request
+    openai_images.http_multipart_request = fake_http_multipart_request
+    try:
+        result, warnings, error = openai_images.try_edit(
+            {"BANANAHUB_PROVIDER": "openai", "OPENAI_API_KEY": "test-key"},
+            "dall-e-2",
+            "replace background",
+            "input.png",
+            openai_images.resolve_openai_endpoint_for_test,
+            response_format="b64_json",
+        )
+    finally:
+        openai_images.http_multipart_request = original
+
+    assert result == [image_bytes]
+    assert warnings == []
+    assert error is None
+    assert calls[0]["fields"]["response_format"] == "b64_json"
 
 
 def resolve_openai_endpoint_for_test(base_url):
@@ -375,10 +537,15 @@ if __name__ == "__main__":
     test_build_generation_payload_prefers_explicit_openai_size_for_compatible_gateway()
     test_build_generation_payload_for_gpt_image_omits_response_format_and_keeps_n()
     test_try_generate_posts_to_images_generations()
+    test_try_generate_allows_timeout_override()
+    test_try_generate_prefers_call_timeout_over_env()
     test_try_generate_openai_compatible_uses_gateway_safe_defaults()
+    test_try_generate_openai_compatible_prefers_openai_api_key_when_available()
     test_try_generate_openai_compatible_preserves_explicit_size()
     test_try_generate_openai_compatible_preserves_explicit_quality_and_format()
     test_try_generate_returns_multiple_images()
+    test_try_generate_preserves_explicit_response_format()
     test_try_edit_posts_multipart_with_mask_and_refs()
-    test_try_edit_single_image_uses_plain_image_field_and_legacy_response_format()
+    test_try_edit_single_image_uses_plain_image_field_without_response_format_by_default()
+    test_try_edit_preserves_explicit_response_format()
     print("ok")

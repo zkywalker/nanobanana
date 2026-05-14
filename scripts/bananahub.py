@@ -62,6 +62,58 @@ TELEMETRY_STATE_PATH = runtime_cfg.TELEMETRY_STATE_PATH
 HUB_API_BASE = os.environ.get("BANANAHUB_HUB_API", "https://worker.bananahub.ai/api")
 DEFAULT_TEMPLATE_REPO = "bananahub-ai/bananahub-skill"
 DEFAULT_PROMPT_ARCHIVE_DIR = "bananahub-prompts"
+SKILL_LAYER_COMMANDS = {
+    "optimize": {
+        "description": "Optimize or translate the prompt without calling a provider.",
+        "reference": "references/optimization-pipeline.md",
+    },
+    "templates": {
+        "description": "List or inspect bundled and installed templates.",
+        "reference": "references/template-system.md",
+    },
+    "use": {
+        "description": "Apply a prompt template or activate a workflow template.",
+        "reference": "references/template-system.md",
+    },
+    "discover": {
+        "description": "Search BananaHub catalogs for reusable templates.",
+        "reference": "references/hub-discovery.md",
+    },
+    "create-template": {
+        "description": "Guide creation of a prompt or workflow template.",
+        "reference": "references/template-system.md",
+    },
+}
+
+
+def _handle_skill_layer_command(argv):
+    """Return a machine-readable explanation for commands owned by the agent skill."""
+    if not argv:
+        return False
+    command = argv[0]
+    meta = SKILL_LAYER_COMMANDS.get(command)
+    if not meta:
+        return False
+    print(json.dumps({
+        "status": "skill_layer_command",
+        "command": command,
+        "description": meta["description"],
+        "reference": meta["reference"],
+        "message": (
+            f"`{command}` is handled by the /bananahub agent skill before provider execution. "
+            f"Use `/bananahub {command} ...` in an agent session, or use `generate`, `edit`, "
+            "`models`, `check-mode`, `init`, or `config` with this runtime script."
+        ),
+        "runtime_commands": ["generate", "edit", "models", "check-mode", "init", "config"],
+        "agent_actions": [
+            f"Read {meta['reference']}.",
+            "Resolve templates/prompts locally when possible.",
+            "Only call scripts/bananahub.py generate or edit after the prompt and provider options are ready.",
+        ],
+    }, ensure_ascii=False, indent=2))
+    return True
+
+
 VALID_TEMPLATE_DISTRIBUTIONS = {"bundled", "remote"}
 VALID_CATALOG_SOURCES = {"curated", "discovered"}
 VALID_TELEMETRY_EVENTS = {"selected", "generate_success", "edit_success"}
@@ -155,6 +207,10 @@ def _active_api_key(config, runtime_support=None):
         return config.get("OPENAI_API_KEY", ""), "OPENAI_API_KEY", "openai"
     if provider == PROVIDER_OPENAI_COMPATIBLE and config.get("OPENAI_API_KEY"):
         return config.get("OPENAI_API_KEY", ""), "OPENAI_API_KEY", "openai-compatible"
+    if provider == PROVIDER_OPENAI_COMPATIBLE:
+        if config.get("GEMINI_API_KEY"):
+            return config.get("GEMINI_API_KEY", ""), "GEMINI_API_KEY", "openai-compatible"
+        return "", "OPENAI_API_KEY", "openai-compatible"
     return config.get("GEMINI_API_KEY", ""), "GEMINI_API_KEY", "gemini"
 
 
@@ -407,6 +463,7 @@ def load_config(config_file=None):
     if errors:
         sources = [
             f"  --config <file>",
+            f"  env OPENAI_API_KEY / OPENAI_BASE_URL",
             f"  env GEMINI_API_KEY / GOOGLE_API_KEY",
             f"  env BANANAHUB_PROVIDER / BANANAHUB_AUTH_MODE / BANANAHUB_MODEL",
             f"  env GOOGLE_GEMINI_BASE_URL / GEMINI_BASE_URL / BANANAHUB_BASE_URL",
@@ -437,11 +494,10 @@ def get_client(config):
         }, ensure_ascii=False))
         sys.exit(1)
 
-    provider = config.get("BANANAHUB_PROVIDER", DEFAULT_PROVIDER)
-    api_key = config.get("OPENAI_API_KEY", "") if provider == PROVIDER_OPENAI else config.get("GEMINI_API_KEY", "")
-    base_url = config.get("GOOGLE_GEMINI_BASE_URL", "")
     provider = runtime_support["provider"]
     auth_mode = runtime_support["auth_mode"]
+    api_key, _, _ = _active_api_key(config, runtime_support)
+    base_url = config.get("GOOGLE_GEMINI_BASE_URL", "")
 
     if auth_mode == AUTH_MODE_API_KEY and not api_key:
         print(json.dumps({"status": "error", "error": "API key not found in config"}))
@@ -474,9 +530,13 @@ def _serialize_effective_config(config):
     """Return a display-friendly config snapshot."""
     return config_store.serialize_effective_config(config, _chatgpt_base_url)
 
-def _serialize_resolved_from(resolved_from):
+def _serialize_resolved_from(config, resolved_from):
     """Map internal config keys to stable public field names."""
-    return config_store.serialize_resolved_from(resolved_from)
+    return config_store.serialize_resolved_from(config, resolved_from)
+
+def _inactive_config_sources(config, resolved_from):
+    """Return configured keys ignored because another provider is active."""
+    return config_store.inactive_config_sources(config, resolved_from)
 
 def _load_persisted_config_snapshot():
     """Return persisted config.json interpreted through the current config schema."""
@@ -636,6 +696,8 @@ def _openai_try_generate(
     n=None,
     moderation=None,
     user=None,
+    response_format=None,
+    timeout=None,
 ):
     """Attempt image generation against an OpenAI-compatible endpoint."""
     return openai_provider.try_generate(
@@ -653,6 +715,8 @@ def _openai_try_generate(
         n=n,
         moderation=moderation,
         user=user,
+        response_format=response_format,
+        timeout=timeout,
         provider_openai=PROVIDER_OPENAI,
         default_provider=DEFAULT_PROVIDER,
     )
@@ -677,6 +741,8 @@ def _openai_try_edit(
     moderation=None,
     input_fidelity=None,
     user=None,
+    response_format=None,
+    timeout=None,
 ):
     """Attempt OpenAI-native image editing via multipart Images API."""
     return openai_provider.try_edit(
@@ -696,6 +762,8 @@ def _openai_try_edit(
         moderation=moderation,
         input_fidelity=input_fidelity,
         user=user,
+        response_format=response_format,
+        timeout=timeout,
         provider_openai=PROVIDER_OPENAI,
         default_provider=DEFAULT_PROVIDER,
     )
@@ -798,6 +866,7 @@ def _build_init_checks(config, resolved_from, config_sources, explicit_resolved_
     })
 
     runtime_support = _runtime_support_status(config)
+    effective = _serialize_effective_config(config)
     checks.append({
         "name": "provider",
         "ok": True,
@@ -838,7 +907,6 @@ def _build_init_checks(config, resolved_from, config_sources, explicit_resolved_
             "error": "API key not found for the selected provider.",
         })
 
-    effective = _serialize_effective_config(config)
     base_url = effective.get("base_url")
     if runtime_support["provider"] in {PROVIDER_GEMINI_COMPATIBLE, PROVIDER_OPENAI_COMPATIBLE, PROVIDER_CHATGPT_COMPATIBLE} and not base_url:
         checks.append({"name": "base_url", "ok": False, "error": f"provider '{runtime_support['provider']}' requires a base_url."})
@@ -875,8 +943,10 @@ def _build_init_checks(config, resolved_from, config_sources, explicit_resolved_
 def _init_setup_guide(diagnosis=None):
     diagnosis = diagnosis or {}
     return {
-        "summary": "Run the interactive wizard, or use one of these one-line setup commands.",
+        "summary": "Run the guided setup. GPT Image 2 is the recommended default; choose another provider only if that is the image channel you already use.",
         "recommended": "python3 scripts/bananahub.py init --wizard",
+        "default_provider": DEFAULT_PROVIDER,
+        "default_model": DEFAULT_MODEL,
         "commands": [
             "python3 scripts/bananahub.py config quickset --provider openai-compatible --profile gpt --default-profile --base-url <openai-compatible-base-url> --api-key <api-key> --model gpt-image-2",
             "python3 scripts/bananahub.py config quickset --provider openai --profile gpt --default-profile --api-key <openai-api-key> --model gpt-image-2",
@@ -910,6 +980,11 @@ def _prompt_choice(prompt, choices, default=None):
         print("Please enter a number or provider id.")
 
 
+def _looks_like_url(value):
+    value = str(value or "").strip().lower()
+    return value.startswith("http://") or value.startswith("https://")
+
+
 def _prompt_text(prompt, default=None, secret=False, required=False):
     suffix = f" [{default}]" if default else ""
     while True:
@@ -925,20 +1000,30 @@ def _prompt_text(prompt, default=None, secret=False, required=False):
         print("This value is required.")
 
 
+def _prompt_api_key(prompt="API key (hidden; stored locally)"):
+    while True:
+        value = _prompt_text(prompt, secret=True, required=True)
+        if _looks_like_url(value):
+            print("That looks like a URL, not an API key.")
+            continue
+        return value
+
+
 def _run_init_wizard(args):
     choices = [
-        (PROVIDER_OPENAI_COMPATIBLE, "OpenAI-compatible gateway, e.g. Cherry Studio / Bigfish"),
-        (PROVIDER_OPENAI, "OpenAI / GPT Image official API"),
-        (PROVIDER_GOOGLE_AI_STUDIO, "Google AI Studio / Gemini Developer API"),
+        (PROVIDER_OPENAI_COMPATIBLE, "OpenAI-compatible image gateway (recommended, GPT Image 2)"),
+        (PROVIDER_OPENAI, "OpenAI official GPT Image API"),
+        (PROVIDER_GOOGLE_AI_STUDIO, "Google AI Studio / Gemini"),
         (PROVIDER_GEMINI_COMPATIBLE, "Gemini-compatible gateway"),
         (PROVIDER_VERTEX_AI, "Vertex AI"),
-        (PROVIDER_CHATGPT_COMPATIBLE, "ChatGPT-compatible image endpoint"),
+        (PROVIDER_CHATGPT_COMPATIBLE, "Chat/completions endpoint that returns images"),
     ]
-    print("Welcome to BananaHub setup 🍌")
+    print("BananaHub setup")
+    print("Default: GPT Image 2 through an OpenAI-compatible image endpoint.")
     provider = _normalize_provider(args.provider) if getattr(args, "provider", None) else _prompt_choice(
-        "Which image provider do you want to use?",
+        "Which image channel do you already have?",
         choices,
-        default=PROVIDER_OPENAI_COMPATIBLE,
+        default=DEFAULT_PROVIDER,
     )
     auth_mode = getattr(args, "auth_mode", None) or AUTH_MODE_API_KEY
     if provider == PROVIDER_VERTEX_AI and not getattr(args, "auth_mode", None):
@@ -952,12 +1037,20 @@ def _run_init_wizard(args):
     model = getattr(args, "model", None) or _provider_default_model(provider)
 
     if provider in {PROVIDER_OPENAI_COMPATIBLE, PROVIDER_GEMINI_COMPATIBLE, PROVIDER_CHATGPT_COMPATIBLE} and not base_url:
-        base_url = _prompt_text("Base URL", required=True)
+        if not api_key:
+            entered_key = _prompt_text("API key (hidden; stored locally)", secret=True, required=True)
+            if _looks_like_url(entered_key):
+                print("That looks like a URL. BananaHub needs the endpoint URL first, then the API key.")
+                base_url = entered_key
+            else:
+                api_key = entered_key
+        if not base_url:
+            base_url = _prompt_text("Base URL", required=True)
     if provider == PROVIDER_VERTEX_AI:
         project = project or _prompt_text("Google Cloud project", required=True)
         location = location or _prompt_text("Google Cloud location", default=DEFAULT_LOCATION, required=True)
     if auth_mode == AUTH_MODE_API_KEY and not api_key:
-        api_key = _prompt_text("API key (hidden; stored locally)", secret=True, required=True)
+        api_key = _prompt_api_key()
     if not getattr(args, "model", None):
         model = _prompt_text("Default model", default=model, required=True)
 
@@ -1081,7 +1174,8 @@ def cmd_config_show(args):
         "preferred_path": str(SKILL_CONFIG_PATH),
         "existing_sources": _list_config_sources(config_sources, explicit_resolved_from),
         "effective_config": _serialize_effective_config(config),
-        "resolved_from": _serialize_resolved_from(resolved_from),
+        "resolved_from": _serialize_resolved_from(config, resolved_from),
+        "ignored_config_sources": _inactive_config_sources(config, resolved_from),
         "runtime_support": runtime_support,
         "custom_endpoint_enabled": bool(config.get("GOOGLE_GEMINI_BASE_URL") or config.get("OPENAI_BASE_URL") or config.get("BANANAHUB_CHATGPT_BASE_URL")),
         "telemetry": {
@@ -1149,7 +1243,7 @@ def _target_config_for_profile(persisted_config, profile=None):
 
 
 def _api_key_field_for_provider(provider):
-    if provider == PROVIDER_OPENAI:
+    if provider in {PROVIDER_OPENAI, PROVIDER_OPENAI_COMPATIBLE}:
         return "openai_api_key"
     if provider == PROVIDER_CHATGPT_COMPATIBLE:
         return "chatgpt_api_key"
@@ -1158,7 +1252,7 @@ def _api_key_field_for_provider(provider):
 
 def _base_url_field_for_provider(provider):
     if provider in {PROVIDER_OPENAI, PROVIDER_OPENAI_COMPATIBLE}:
-        return "openai_base_url" if provider == PROVIDER_OPENAI else "base_url"
+        return "openai_base_url"
     if provider == PROVIDER_CHATGPT_COMPATIBLE:
         return "chatgpt_base_url"
     return "base_url"
@@ -1465,6 +1559,7 @@ def _diagnose_config_state(config, resolved_from=None, config_sources=None, expl
     requires_user_secret = "api_key" in missing_fields
     safe_to_autofix = [field for field in missing_fields if field not in {"api_key"}]
     default_model = _provider_default_model(provider)
+    ignored_config_sources = _inactive_config_sources(config, resolved_from)
 
     if missing_fields:
         if provider == PROVIDER_OPENAI_COMPATIBLE:
@@ -1506,7 +1601,8 @@ def _diagnose_config_state(config, resolved_from=None, config_sources=None, expl
         "profile": profile,
         "existing_sources": _list_config_sources(config_sources, explicit_resolved_from),
         "effective_config": effective,
-        "resolved_from": _serialize_resolved_from(resolved_from),
+        "resolved_from": _serialize_resolved_from(config, resolved_from),
+        "ignored_config_sources": ignored_config_sources,
         "runtime_support": runtime_support,
         "validation_errors": validation_errors,
         "active_api_key": {
@@ -1526,6 +1622,8 @@ def _diagnose_config_state(config, resolved_from=None, config_sources=None, expl
         "agent_notes": [
             "Never ask the user to paste real API keys into chat; prefer the local init wizard or a terminal command.",
             "Use config quickset for one-command setup when the user already knows provider/base_url/model.",
+            "GPT Image 2 is the recommended default model; preserve an explicit provider/model the user already configured.",
+            "Treat ignored_config_sources as informational only; they are not active for this provider.",
             "Install missing dependencies locally before attempting provider calls.",
             "Use --test-generate only after the user consents to spend image-generation quota.",
         ],
@@ -1630,7 +1728,8 @@ def cmd_check_mode(args):
         "host_native_available": host_native_available,
         "existing_sources": _list_config_sources(config_sources, explicit_resolved_from),
         "effective_config": _serialize_effective_config(config),
-        "resolved_from": _serialize_resolved_from(resolved_from),
+        "resolved_from": _serialize_resolved_from(config, resolved_from),
+        "ignored_config_sources": _inactive_config_sources(config, resolved_from),
         "runtime_support": runtime_support,
         "validation_errors": validation_errors,
         "active_api_key": {
@@ -2180,6 +2279,8 @@ def cmd_edit(args):
                 "output_compression": getattr(args, "output_compression", None),
                 "moderation": getattr(args, "moderation", None),
                 "input_fidelity": getattr(args, "input_fidelity", None),
+                "response_format": getattr(args, "response_format", None),
+                "timeout": getattr(args, "timeout", None),
                 "user": getattr(args, "user", None),
             },
             "warnings": option_warnings,
@@ -2246,7 +2347,7 @@ def cmd_edit(args):
 
     if runtime_support["transport"] != TRANSPORT_OPENAI_REST and any(
         getattr(args, name, None)
-        for name in ("openai_size", "quality", "background", "output_format", "output_compression", "moderation", "input_fidelity", "user")
+        for name in ("openai_size", "quality", "background", "output_format", "output_compression", "moderation", "input_fidelity", "response_format", "timeout", "user")
     ):
         print(json.dumps({
             "status": "error",
@@ -2314,6 +2415,8 @@ def cmd_edit(args):
                         n=getattr(args, "n", None),
                         moderation=getattr(args, "moderation", None),
                         input_fidelity=getattr(args, "input_fidelity", None),
+                        response_format=getattr(args, "response_format", None),
+                        timeout=getattr(args, "timeout", None),
                         user=getattr(args, "user", None),
                     )
                     if gen_error:
@@ -2602,6 +2705,8 @@ def cmd_generate(args):
                 "output_format": getattr(args, "output_format", None),
                 "output_compression": getattr(args, "output_compression", None),
                 "moderation": getattr(args, "moderation", None),
+                "response_format": getattr(args, "response_format", None),
+                "timeout": getattr(args, "timeout", None),
                 "user": getattr(args, "user", None),
             },
             "warnings": option_warnings,
@@ -2627,7 +2732,7 @@ def cmd_generate(args):
         sys.exit(1)
     if runtime_support["transport"] != TRANSPORT_OPENAI_REST and any(
         getattr(args, name, None)
-        for name in ("openai_size", "quality", "background", "output_format", "output_compression", "moderation", "user")
+        for name in ("openai_size", "quality", "background", "output_format", "output_compression", "moderation", "response_format", "timeout", "user")
     ):
         print(json.dumps({
             "status": "error",
@@ -2684,6 +2789,8 @@ def cmd_generate(args):
                         output_compression=getattr(args, "output_compression", None),
                         n=getattr(args, "n", None),
                         moderation=getattr(args, "moderation", None),
+                        response_format=getattr(args, "response_format", None),
+                        timeout=getattr(args, "timeout", None),
                         user=getattr(args, "user", None),
                     )
                     image_bytes = image_items[0] if image_items else None
@@ -2841,6 +2948,15 @@ def cmd_generate(args):
 
 
 def main():
+    raw_args = sys.argv[1:]
+    skill_args = raw_args
+    if raw_args and raw_args[0] == "--config" and len(raw_args) >= 3:
+        skill_args = raw_args[2:]
+    elif raw_args and raw_args[0].startswith("--config="):
+        skill_args = raw_args[1:]
+    if _handle_skill_layer_command(skill_args):
+        return
+
     parser = argparse.ArgumentParser(prog="bananahub.py", description="BananaHub - provider-backed image generation")
     parser.add_argument("--config", help="Path to config file (JSON or .env)")
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
@@ -2859,6 +2975,8 @@ def main():
     gen_parser.add_argument("--output-format", help="Provider-native output format, e.g. png/jpeg/webp")
     gen_parser.add_argument("--output-compression", type=int, help="Provider-native output compression when supported")
     gen_parser.add_argument("--moderation", help="OpenAI-native moderation mode when supported")
+    gen_parser.add_argument("--response-format", choices=["url", "b64_json"], help="Legacy OpenAI Images response format override")
+    gen_parser.add_argument("--timeout", type=int, help="OpenAI image request timeout in seconds")
     gen_parser.add_argument("--user", help="OpenAI user identifier for abuse monitoring")
     gen_parser.add_argument("--resize", help="Post-process resize to WxH, e.g. 1024x1024")
     gen_parser.add_argument("--size", "-s", help="Legacy compatibility flag: use 1K/2K/4K for native image size, or WxH for post-processing resize")
@@ -2887,6 +3005,8 @@ def main():
     edit_parser.add_argument("--output-compression", type=int, help="Provider-native output compression when supported")
     edit_parser.add_argument("--moderation", help="OpenAI-native moderation mode when supported")
     edit_parser.add_argument("--input-fidelity", help="OpenAI-native input fidelity hint when supported, e.g. high/low")
+    edit_parser.add_argument("--response-format", choices=["url", "b64_json"], help="Legacy OpenAI Images response format override")
+    edit_parser.add_argument("--timeout", type=int, help="OpenAI image request timeout in seconds")
     edit_parser.add_argument("--user", help="OpenAI user identifier for abuse monitoring")
     edit_parser.add_argument("--resize", help="Post-process resize to WxH, e.g. 1024x1024")
     edit_parser.add_argument("--size", "-s", help="Legacy compatibility flag: use 1K/2K/4K for native image size, or WxH for post-processing resize")

@@ -2,6 +2,8 @@
 import importlib.util
 import json
 import os
+from contextlib import redirect_stdout
+from io import StringIO
 import sys
 import tempfile
 from pathlib import Path
@@ -81,9 +83,9 @@ def test_quickset_openai_compatible_writes_gpt_profile():
             "gpt": {
                 "provider": "openai-compatible",
                 "auth_mode": "api_key",
-                "api_key": "test-key",
+                "openai_api_key": "test-key",
                 "model": "gpt-image-2",
-                "base_url": "https://token.bigfish.space/v1",
+                "openai_base_url": "https://token.bigfish.space/v1",
             }
         },
         "default_profile": "gpt",
@@ -91,6 +93,8 @@ def test_quickset_openai_compatible_writes_gpt_profile():
 
 
 def test_quickset_defaults_openai_compatible_to_gpt_image_2():
+    assert bananahub.DEFAULT_PROVIDER == "openai-compatible"
+    assert bananahub.DEFAULT_MODEL == "gpt-image-2"
     assert bananahub._provider_default_model("openai-compatible") == "gpt-image-2"
     assert bananahub._default_profile_for_provider("openai-compatible") == "gpt"
 
@@ -104,9 +108,35 @@ def test_doctor_reports_missing_secret_and_agent_contract():
     assert diagnosis["status"] == "needs_setup"
     assert diagnosis["provider"] == "openai-compatible"
     assert diagnosis["requires_user_secret"] is True
+    assert diagnosis["active_api_key"]["config_key"] == "OPENAI_API_KEY"
     assert "api_key" in diagnosis["missing_fields"]
     assert "config quickset --provider openai-compatible" in diagnosis["suggested_commands"][0]
     assert "gpt-image-2" in diagnosis["suggested_commands"][0]
+
+
+def test_doctor_scopes_resolved_from_to_active_provider():
+    config = {
+        "BANANAHUB_PROVIDER": "google-ai-studio",
+        "BANANAHUB_TRANSPORT": "genai",
+        "BANANAHUB_AUTH_MODE": "api_key",
+        "GEMINI_API_KEY": "gemini-key",
+        "BANANAHUB_CHATGPT_API_KEY": "chat-key",
+        "BANANAHUB_CHATGPT_BASE_URL": "https://chat.example/v1",
+    }
+    resolved = {
+        "BANANAHUB_PROVIDER": "config.json",
+        "BANANAHUB_TRANSPORT": "default:google-ai-studio",
+        "BANANAHUB_AUTH_MODE": "default:google-ai-studio",
+        "GEMINI_API_KEY": "config.json",
+        "BANANAHUB_CHATGPT_API_KEY": "env:BANANAHUB_CHATGPT_API_KEY",
+        "BANANAHUB_CHATGPT_BASE_URL": "env:BANANAHUB_CHATGPT_BASE_URL",
+    }
+
+    diagnosis = bananahub._diagnose_config_state(config, resolved_from=resolved)
+
+    assert diagnosis["resolved_from"]["api_key"] == "config.json"
+    assert diagnosis["resolved_from"]["base_url"] is None
+    assert diagnosis["ignored_config_sources"][0]["reason"] == "inactive for selected provider"
 
 
 def test_dependency_status_is_provider_aware():
@@ -126,10 +156,25 @@ def test_dependency_install_command_uses_current_python_user_site():
     assert command[-1] == "pillow"
 
 
+def test_skill_layer_runtime_stub_is_machine_readable():
+    stdout = StringIO()
+    with redirect_stdout(stdout):
+        handled = bananahub._handle_skill_layer_command(["optimize", "一只猫"])
+
+    payload = json.loads(stdout.getvalue())
+
+    assert handled is True
+    assert payload["status"] == "skill_layer_command"
+    assert payload["command"] == "optimize"
+    assert "generate" in payload["runtime_commands"]
+
+
 if __name__ == "__main__":
     test_quickset_openai_compatible_writes_gpt_profile()
     test_quickset_defaults_openai_compatible_to_gpt_image_2()
     test_doctor_reports_missing_secret_and_agent_contract()
+    test_doctor_scopes_resolved_from_to_active_provider()
     test_dependency_status_is_provider_aware()
     test_dependency_install_command_uses_current_python_user_site()
+    test_skill_layer_runtime_stub_is_machine_readable()
     print("ok")

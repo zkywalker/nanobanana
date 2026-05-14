@@ -16,18 +16,18 @@ metadata:
     bins:
       - python3
     python:
-      - google-genai
       - pillow
     env:
+      - OPENAI_API_KEY
       - GEMINI_API_KEY
       - GOOGLE_API_KEY
-  primaryEnv: GEMINI_API_KEY
+  primaryEnv: OPENAI_API_KEY
 user_invocable: true
 ---
 
 # BananaHub
 
-Generate or edit provider-backed images from non-English or mixed-language requests inside one `/bananahub` workflow. Gemini/Nano Banana remains the default model family, and OpenAI GPT Image support is provider-routed. BananaHub keeps prompt optimization, conservative enhancement, model fallback, image editing, template use, and BananaHub discovery in a single skill instead of splitting them across separate installs.
+Generate or edit provider-backed images from non-English or mixed-language requests inside one `/bananahub` workflow. GPT Image 2 through an OpenAI-compatible image endpoint is the default path; user-configured Gemini/Nano Banana, OpenAI official, Vertex, and chat-compatible paths are preserved. BananaHub keeps prompt optimization, conservative enhancement, model fallback, image editing, template use, and BananaHub discovery in a single skill instead of splitting them across separate installs.
 
 ## Quick Start
 
@@ -63,14 +63,14 @@ Generate or edit provider-backed images from non-English or mixed-language reque
 - **Prompt archive**: current working directory `bananahub-prompts/` when `--save-prompt`, `--prompt-output`, or `BANANAHUB_SAVE_PROMPTS=1` is used
 - **API config** (priority high→low):
   1. `--config <file>` CLI flag
-  2. Environment variables (`GOOGLE_API_KEY`, `GEMINI_API_KEY`, `BANANAHUB_PROVIDER`, `BANANAHUB_AUTH_MODE`, `BANANAHUB_MODEL`, `GOOGLE_GEMINI_BASE_URL`, `GEMINI_BASE_URL`, `BANANAHUB_BASE_URL`, `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`)
+  2. Environment variables (`OPENAI_API_KEY`, `OPENAI_BASE_URL`, `GOOGLE_API_KEY`, `GEMINI_API_KEY`, `BANANAHUB_PROVIDER`, `BANANAHUB_AUTH_MODE`, `BANANAHUB_MODEL`, `GOOGLE_GEMINI_BASE_URL`, `GEMINI_BASE_URL`, `BANANAHUB_BASE_URL`, `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`)
   3. Skill config: `~/.config/bananahub/config.json`
      - `{"provider": "google-ai-studio", "api_key": "...", "model": "gemini-3-pro-image-preview"}`
      - `{"provider": "gemini-compatible", "api_key": "...", "base_url": "https://..."}`
      - `{"provider": "openai", "openai_api_key": "...", "model": "gpt-image-2"}`
-     - `{"provider": "openai-compatible", "api_key": "...", "base_url": "https://...", "model": "gpt-image-2"}`
+     - `{"provider": "openai-compatible", "openai_api_key": "...", "openai_base_url": "https://...", "model": "gpt-image-2"}`
      - `{"provider": "chatgpt-compatible", "chatgpt_api_key": "...", "chatgpt_base_url": "https://...", "model": "gpt-5.4"}`
-     - multi-profile: `{"default_profile":"nano","profiles":{"nano":{"provider":"google-ai-studio","api_key":"..."},"gpt":{"provider":"openai","openai_api_key":"...","model":"gpt-image-2"}}}`
+     - multi-profile: `{"default_profile":"gpt","profiles":{"gpt":{"provider":"openai-compatible","openai_api_key":"...","openai_base_url":"https://...","model":"gpt-image-2"},"nano":{"provider":"google-ai-studio","api_key":"..."}}}`
      - `{"provider": "vertex-ai", "auth_mode": "adc", "project": "...", "location": "global"}`
   4. Persistent config helpers:
      - `python3 {baseDir}/scripts/bananahub.py config show`
@@ -92,15 +92,15 @@ Before executing any command other than `help`, check if the environment is read
 3. Never ask the user to paste real API keys into chat; prefer the local wizard or a terminal command with `<key>` placeholder.
 4. If config exists but generation fails with auth/dependency errors → suggest `config doctor --json` or `init --wizard`.
 5. Persist new config into `~/.config/bananahub/config.json`, preferably as a named profile (`gpt`, `nano`, `vertex`, or `chat`).
-6. Treat `gpt-image-2` as the overall default model; provider-specific defaults still apply for Gemini/Vertex paths.
+6. Treat `openai-compatible` + `gpt-image-2` as the default setup path. If the user already configured a provider/profile/model, preserve it and route within that provider.
 7. Supported runtime providers:
    - `google-ai-studio`: generate / edit / models / init
    - `gemini-compatible`: generate / edit / models / init
    - `vertex-ai`: generate / edit / models / init
    - `openai`: OpenAI-native GPT Image generate / edit / models / init
-   - `openai-compatible`: OpenAI-style endpoint generate / models / init, capability-dependent
+   - `openai-compatible`: OpenAI-style Images API generate / edit / models / init, capability-dependent
    - `chatgpt-compatible`: chat/completions endpoint that returns images inside assistant replies
-8. `openai-compatible` is not the same as OpenAI-native GPT Image. Do not assume edit, mask edit, or GPT Image parameters unless the endpoint declares support.
+8. `openai-compatible` is not the same as OpenAI-native GPT Image. The runtime attempts standard Images API generation/editing, but exact support still depends on the gateway.
 9. Endpoint normalization rules:
    - `gemini-compatible`: if the user pastes a URL ending in `/v1beta`, keep it conceptually but normalize the trailing version during runtime so it is not duplicated
    - `openai-compatible`: if the user pastes a bare host, the runtime may append `/v1`; for Google's official endpoint, resolve it to `/v1beta/openai`
@@ -122,6 +122,8 @@ Capability ownership is layered:
 - **Provider/model layer**: image edit, mask edit, multi-reference, exact size, native quality, transparent background, output format/compression, and fallback are not universal; route them through `references/capability-registry.md`, `references/model-registry.json`, and provider adapters.
 
 If a feature changes request payload shape, file validation, cost, policy behavior, or output parsing, do not treat it as cross-model even if several providers happen to support similar wording.
+
+Agent operating principle: do not ask the human to make choices the agent can resolve from diagnosis, config, templates, or file paths. Ask only for secrets, provider/channel selection when unknown, paid generation consent, or genuinely creative direction.
 
 ## Command Routing
 
@@ -148,7 +150,8 @@ Route user input to the appropriate action based on arguments:
 Note:
 - `optimize`, `--direct`, and `--raw` are **skill-layer controls** interpreted by you before invoking the script
 - Do **not** pass `--direct` or `--raw` through to `{baseDir}/scripts/bananahub.py`
-- `discover` is also a **skill-layer command**: use BananaHub machine-readable files and `npx bananahub add ...`, not `{baseDir}/scripts/bananahub.py`
+- `optimize`, `templates`, `use`, `discover`, and `create-template` are **skill-layer commands**. If they are accidentally passed to `{baseDir}/scripts/bananahub.py`, the script returns a machine-readable `status: "skill_layer_command"` explanation for agents.
+- `discover` uses BananaHub machine-readable files and `npx bananahub add ...`, not provider generation directly.
 - `telemetry` is an **internal helper**, not a user-facing chat command. Use it when a template is selected or successfully produces output.
 
 Optional flags (append to any generation command):

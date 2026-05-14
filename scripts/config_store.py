@@ -136,12 +136,18 @@ def finalize_config(config, resolved_from):
         elif config.get("BANANAHUB_CHATGPT_API_KEY") and not config.get("GEMINI_API_KEY") and not config.get("OPENAI_API_KEY"):
             provider = cfg.PROVIDER_CHATGPT_COMPATIBLE
             provider_source = "inferred:BANANAHUB_CHATGPT_API_KEY"
+        elif config.get("OPENAI_BASE_URL"):
+            provider = cfg.PROVIDER_OPENAI_COMPATIBLE
+            provider_source = "inferred:OPENAI_BASE_URL"
         elif config.get("OPENAI_API_KEY") and not config.get("GEMINI_API_KEY"):
             provider = cfg.PROVIDER_OPENAI
             provider_source = "inferred:OPENAI_API_KEY"
-        elif config.get("GOOGLE_GEMINI_BASE_URL"):
+        elif config.get("GOOGLE_GEMINI_BASE_URL") and config.get("GEMINI_API_KEY"):
             provider = cfg.PROVIDER_GEMINI_COMPATIBLE
-            provider_source = "inferred:base_url"
+            provider_source = "inferred:gemini-base-url"
+        elif config.get("GEMINI_API_KEY"):
+            provider = cfg.PROVIDER_GOOGLE_AI_STUDIO
+            provider_source = "inferred:GEMINI_API_KEY"
         else:
             provider = cfg.DEFAULT_PROVIDER
             provider_source = "default"
@@ -216,7 +222,9 @@ def config_validation_errors(config):
             errors.append("ChatGPT-compatible API key not found. Set BANANAHUB_CHATGPT_API_KEY.")
         elif support["provider"] == cfg.PROVIDER_OPENAI and not config.get("OPENAI_API_KEY"):
             errors.append("OpenAI API key not found. Set OPENAI_API_KEY or persist openai_api_key in BananaHub config.")
-        elif support["provider"] not in {cfg.PROVIDER_OPENAI, cfg.PROVIDER_CHATGPT_COMPATIBLE} and not config.get("GEMINI_API_KEY"):
+        elif support["provider"] == cfg.PROVIDER_OPENAI_COMPATIBLE and not (config.get("OPENAI_API_KEY") or config.get("GEMINI_API_KEY")):
+            errors.append("OpenAI-compatible API key not found. Set OPENAI_API_KEY or GEMINI_API_KEY, or persist api_key/openai_api_key in BananaHub config.")
+        elif support["provider"] not in {cfg.PROVIDER_OPENAI, cfg.PROVIDER_OPENAI_COMPATIBLE, cfg.PROVIDER_CHATGPT_COMPATIBLE} and not config.get("GEMINI_API_KEY"):
             errors.append("API key not found. Set GEMINI_API_KEY or GOOGLE_API_KEY, or persist api_key in BananaHub config.")
     if support["provider"] == cfg.PROVIDER_GEMINI_COMPATIBLE and not config.get("GOOGLE_GEMINI_BASE_URL"):
         errors.append("provider 'gemini-compatible' requires a base_url.")
@@ -296,13 +304,84 @@ def list_config_sources(config_sources, explicit_resolved_from):
     return ordered
 
 
-def serialize_resolved_from(resolved_from):
+def effective_api_key_name(config):
+    support = runtime_support_status(config)
+    if support["auth_mode"] != cfg.AUTH_MODE_API_KEY:
+        return None
+    provider = support["provider"]
+    if provider == cfg.PROVIDER_CHATGPT_COMPATIBLE:
+        return "BANANAHUB_CHATGPT_API_KEY"
+    if provider == cfg.PROVIDER_OPENAI:
+        return "OPENAI_API_KEY"
+    if provider == cfg.PROVIDER_OPENAI_COMPATIBLE:
+        if config.get("OPENAI_API_KEY"):
+            return "OPENAI_API_KEY"
+        if config.get("GEMINI_API_KEY"):
+            return "GEMINI_API_KEY"
+        return "OPENAI_API_KEY"
+    return "GEMINI_API_KEY"
+
+
+def effective_base_url_name(config):
+    support = runtime_support_status(config)
+    provider = support["provider"]
+    if provider == cfg.PROVIDER_CHATGPT_COMPATIBLE:
+        return "BANANAHUB_CHATGPT_BASE_URL"
+    if provider == cfg.PROVIDER_OPENAI:
+        return "OPENAI_BASE_URL" if config.get("OPENAI_BASE_URL") else None
+    if support["transport"] == cfg.TRANSPORT_OPENAI_REST:
+        return "OPENAI_BASE_URL" if config.get("OPENAI_BASE_URL") else "GOOGLE_GEMINI_BASE_URL"
+    if provider == cfg.PROVIDER_GEMINI_COMPATIBLE:
+        return "GOOGLE_GEMINI_BASE_URL"
+    return None
+
+
+def inactive_config_sources(config, resolved_from):
+    active_keys = {
+        "BANANAHUB_PROVIDER",
+        "BANANAHUB_TRANSPORT",
+        "BANANAHUB_AUTH_MODE",
+        "BANANAHUB_MODEL",
+        "BANANAHUB_PROFILE",
+        "GOOGLE_CLOUD_PROJECT",
+        "GOOGLE_CLOUD_LOCATION",
+    }
+    api_key_name = effective_api_key_name(config)
+    base_url_name = effective_base_url_name(config)
+    if api_key_name:
+        active_keys.add(api_key_name)
+    if base_url_name:
+        active_keys.add(base_url_name)
+
+    labels = {
+        "GEMINI_API_KEY": "gemini_api_key",
+        "OPENAI_API_KEY": "openai_api_key",
+        "BANANAHUB_CHATGPT_API_KEY": "chatgpt_api_key",
+        "GOOGLE_GEMINI_BASE_URL": "gemini_base_url",
+        "OPENAI_BASE_URL": "openai_base_url",
+        "BANANAHUB_CHATGPT_BASE_URL": "chatgpt_base_url",
+    }
+    ignored = []
+    for key, label in labels.items():
+        if config.get(key) and key not in active_keys:
+            ignored.append({
+                "field": label,
+                "internal_key": key,
+                "source": resolved_from.get(key),
+                "reason": "inactive for selected provider",
+            })
+    return ignored
+
+
+def serialize_resolved_from(config, resolved_from):
+    api_key_name = effective_api_key_name(config)
+    base_url_name = effective_base_url_name(config)
     return {
         "provider": resolved_from.get("BANANAHUB_PROVIDER"),
         "transport": resolved_from.get("BANANAHUB_TRANSPORT"),
         "auth_mode": resolved_from.get("BANANAHUB_AUTH_MODE"),
-        "api_key": resolved_from.get("GEMINI_API_KEY") or resolved_from.get("OPENAI_API_KEY") or resolved_from.get("BANANAHUB_CHATGPT_API_KEY"),
-        "base_url": resolved_from.get("GOOGLE_GEMINI_BASE_URL") or resolved_from.get("OPENAI_BASE_URL") or resolved_from.get("BANANAHUB_CHATGPT_BASE_URL"),
+        "api_key": resolved_from.get(api_key_name) if api_key_name else None,
+        "base_url": resolved_from.get(base_url_name) if base_url_name else None,
         "model": resolved_from.get("BANANAHUB_MODEL"),
         "profile": resolved_from.get("BANANAHUB_PROFILE"),
         "project": resolved_from.get("GOOGLE_CLOUD_PROJECT"),

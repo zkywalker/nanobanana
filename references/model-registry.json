@@ -1,7 +1,7 @@
 {
   "version": "2.0.0",
   "updated": "2026-04-22",
-  "default_profile": "nano",
+  "default_profile": "gpt",
   "providers": {
     "google-ai-studio": {
       "family": "gemini-image",

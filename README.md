@@ -4,7 +4,7 @@
 
 BananaHub is an agent-native image workflow skill. Describe what you want in Chinese, English, or mixed language; BananaHub cleans up the prompt, detects the available runtime, routes the task to the right image path, and keeps generation, editing, templates, and reusable prompts under one `/bananahub` command.
 
-It is not just a prompt helper. BananaHub acts as a workflow layer between agents and image providers: Gemini / Nano Banana, OpenAI GPT Image, compatible gateways, and host-native image tools.
+It is not just a prompt helper. BananaHub acts as a workflow layer between agents and image providers: GPT Image 2 by default, plus Gemini / Nano Banana, OpenAI official, compatible gateways, and host-native image tools when configured.
 
 ## Why BananaHub
 
@@ -26,6 +26,8 @@ claude skill install https://github.com/bananahub-ai/bananahub-skill
 /bananahub init
 /bananahub 一只橘猫趴在键盘上打盹
 ```
+
+`init` defaults to GPT Image 2 through an OpenAI-compatible image endpoint. If you choose or already configured another provider, BananaHub uses that provider as the default for future runs.
 
 Check the current execution path:
 
@@ -81,6 +83,8 @@ For CLI checks, use `BANANAHUB_HOST_IMAGEGEN=1` or `check-mode --host-imagegen` 
 | `--background <value>` | Provider-native background option |
 | `--output-format <value>` | Provider-native output format, e.g. `png`, `jpeg`, `webp` |
 | `--output-compression <value>` | Provider-native output compression when supported |
+| `--response-format <value>` | Optional legacy OpenAI Images response override: `url` or `b64_json` |
+| `--timeout <seconds>` | OpenAI image request timeout override |
 | `--resize <WxH>` | Resize after generation/editing |
 | `--output <path>` | Image output path |
 | `--save-prompt` | Archive the final prompt under `bananahub-prompts/` |
@@ -90,6 +94,7 @@ For CLI checks, use `BANANAHUB_HOST_IMAGEGEN=1` or `check-mode --host-imagegen` 
 | `--mask <path>` | OpenAI-native mask edit |
 
 Set `BANANAHUB_SAVE_PROMPTS=1` to archive final prompts by default for generate/edit runs.
+Set `BANANAHUB_IMAGE_TIMEOUT=<seconds>` to override the OpenAI image request timeout; the default is `900`. Use `--timeout <seconds>` for a single command.
 
 ## Prompt Archive
 
@@ -113,11 +118,11 @@ BananaHub supports several provider routes. Advanced capabilities are not assume
 
 | Provider | Best For | Generate | Edit | Mask | Notes |
 |---|---|---:|---:|---:|---|
-| `google-ai-studio` | Default path for individuals and teams | ✅ | ✅ | — | Gemini / Nano Banana route |
+| `openai-compatible` | Recommended default for OpenAI-style image gateways | ✅ | ✅ | ✅ | GPT Image 2 path; standard Images API support depends on the gateway |
+| `openai` | Official OpenAI GPT Image APIs | ✅ | ✅ | ✅ | GPT Image native route; supports multi-output and multi-image edits through Images API |
+| `google-ai-studio` | Gemini / Nano Banana users | ✅ | ✅ | — | Gemini Developer API route |
 | `gemini-compatible` | Gemini-style relays or proxies | ✅ | ✅ | — | Depends on the relay |
 | `vertex-ai` | Enterprise GCP / Vertex AI | ✅ | ✅ | — | ADC or API key auth |
-| `openai` | Official OpenAI GPT Image APIs | ✅ | ✅ | ✅ | GPT Image native route; supports multi-output and multi-image edits through Images API |
-| `openai-compatible` | OpenAI-style gateways | ✅ | ✅ | ✅ | Attempts standard Images API features; actual support is gateway-dependent |
 | `chatgpt-compatible` | Chat/completions endpoints that return images | ✅ | — | — | Best-effort URL/base64 extraction |
 
 Setup examples:
@@ -171,6 +176,8 @@ BANANAHUB_PROFILE=gpt python3 scripts/bananahub.py generate \
 The command should return `status: "ok"` with `actual_model: "gpt-image-2"`; telemetry `HTTP 403` warnings do not indicate generation failure.
 
 Config priority: `--config <file>` → environment variables → `~/.config/bananahub/config.json`.
+
+Agent-facing diagnostics are provider-scoped: `resolved_from` only points to active values, while `ignored_config_sources` lists env/profile values that exist but are not used by the selected provider.
 
 ## How Prompt Optimization Works
 

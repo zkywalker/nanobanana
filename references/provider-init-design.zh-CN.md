@@ -1,6 +1,6 @@
 # BananaHub 接入与初始化降本方案
 
-**状态**：proposal
+**状态**：historical proposal; current runtime default is `openai-compatible` + `gpt-image-2`
 **日期**：2026-04-09
 **范围**：`bananahub-skill`
 
@@ -40,13 +40,13 @@
 
 ### A. Google AI Studio / Gemini Developer API
 
-这是最适合默认开箱即用的主路径。
+这是适合 Gemini / Nano Banana 用户的官方路径。当前 BananaHub 的默认开箱路径已经改为 `openai-compatible` + `gpt-image-2`。
 
 特点：
 
 - 用户只需要一个 API key
 - 适合个人用户、轻量使用、最快起步
-- BananaHub 应该把它做成默认推荐路径
+- BananaHub 应保留它作为一键可选路径，但不再把它作为默认推荐路径
 
 建议输入方式：
 
