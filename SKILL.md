@@ -63,8 +63,11 @@ Generate or edit provider-backed images from non-English or mixed-language reque
 - **Prompt archive**: current working directory `bananahub-prompts/` when `--save-prompt`, `--prompt-output`, or `BANANAHUB_SAVE_PROMPTS=1` is used
 - **API config** (priority high→low):
   1. `--config <file>` CLI flag
-  2. Environment variables (`OPENAI_API_KEY`, `OPENAI_BASE_URL`, `GOOGLE_API_KEY`, `GEMINI_API_KEY`, `BANANAHUB_PROVIDER`, `BANANAHUB_AUTH_MODE`, `BANANAHUB_MODEL`, `GOOGLE_GEMINI_BASE_URL`, `GEMINI_BASE_URL`, `BANANAHUB_BASE_URL`, `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`)
-  3. Skill config: `~/.config/bananahub/config.json`
+  2. Selected skill profile in `~/.config/bananahub/config.json`
+  3. Environment variables fill missing fields by default (`OPENAI_API_KEY`, `OPENAI_BASE_URL`, `GOOGLE_API_KEY`, `GEMINI_API_KEY`, `BANANAHUB_PROVIDER`, `BANANAHUB_AUTH_MODE`, `BANANAHUB_MODEL`, `GOOGLE_GEMINI_BASE_URL`, `GEMINI_BASE_URL`, `BANANAHUB_BASE_URL`, `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`)
+     - Use `BANANAHUB_PROFILE=<name>` to select another persisted profile
+     - Set `BANANAHUB_ENV_OVERRIDE=1` only when environment variables should temporarily override profile fields
+  4. Skill config examples:
      - `{"provider": "google-ai-studio", "api_key": "...", "model": "gemini-3-pro-image-preview"}`
      - `{"provider": "gemini-compatible", "api_key": "...", "base_url": "https://..."}`
      - `{"provider": "openai", "openai_api_key": "...", "model": "gpt-image-2"}`
@@ -72,7 +75,7 @@ Generate or edit provider-backed images from non-English or mixed-language reque
      - `{"provider": "chatgpt-compatible", "chatgpt_api_key": "...", "chatgpt_base_url": "https://...", "model": "gpt-5.4"}`
      - multi-profile: `{"default_profile":"gpt","profiles":{"gpt":{"provider":"openai-compatible","openai_api_key":"...","openai_base_url":"https://...","model":"gpt-image-2"},"nano":{"provider":"google-ai-studio","api_key":"..."}}}`
      - `{"provider": "vertex-ai", "auth_mode": "adc", "project": "...", "location": "global"}`
-  4. Persistent config helpers:
+  5. Persistent config helpers:
      - `python3 {baseDir}/scripts/bananahub.py config show`
      - `python3 {baseDir}/scripts/bananahub.py config doctor --json`
      - `python3 {baseDir}/scripts/bananahub.py config quickset --provider openai-compatible --profile gpt --default-profile --base-url https://your-openai-compatible-endpoint --api-key <key> --model gpt-image-2`

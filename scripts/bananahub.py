@@ -469,6 +469,22 @@ def _load_merged_config(config_file=None):
     """Load effective config and return config plus source metadata."""
     return config_store.load_merged_config(config_file, _canonicalize_model, load_dotenv, config_path=SKILL_CONFIG_PATH)
 
+def _config_precedence_state():
+    """Describe how persisted config and environment variables are merged."""
+    return {
+        "persistent_config": str(SKILL_CONFIG_PATH),
+        "env_mode": config_store.env_precedence_mode(),
+        "env_override_flag": runtime_cfg.ENV_OVERRIDE_FLAG,
+        "rule": (
+            "Persisted BananaHub profiles are the default source of truth. "
+            "Environment variables fill missing fields unless BANANAHUB_ENV_OVERRIDE=1 is set."
+        ),
+    }
+
+def _env_shadowed_config_sources(skipped_env):
+    """Return environment values ignored because persisted config already had that field."""
+    return config_store.env_shadowed_config_sources(skipped_env)
+
 def _load_persisted_config_for_write():
     """Load the preferred writable BananaHub config."""
     return config_store.load_persisted_config_for_write(config_path=SKILL_CONFIG_PATH)
@@ -482,22 +498,26 @@ def _apply_command_provider_override(config, provider):
     return config_store.apply_command_provider_override(config, provider)
 
 def load_config(config_file=None):
-    """Load API config with priority chain:
+    """Load API config with a profile-first priority chain:
     1. Explicit --config file (JSON or .env)
-    2. Environment variables
-    3. Skill config: ~/.config/bananahub/config.json
+    2. Persisted BananaHub profile: ~/.config/bananahub/config.json
+    3. Environment variables fill missing fields by default
+
+    Set BANANAHUB_ENV_OVERRIDE=1 when env vars should override persisted profile fields.
     """
-    config, _, _, _ = _load_merged_config(config_file=config_file)
+    config, _, _, _, _ = _load_merged_config(config_file=config_file)
     errors = _config_validation_errors(config)
     if errors:
         sources = [
             f"  --config <file>",
+            f"  {SKILL_CONFIG_PATH}",
+            f"  env vars fill missing fields by default",
+            f"  env {runtime_cfg.ENV_OVERRIDE_FLAG}=1 to override persisted profile fields",
             f"  env OPENAI_API_KEY / OPENAI_BASE_URL",
             f"  env GEMINI_API_KEY / GOOGLE_API_KEY",
             f"  env BANANAHUB_PROVIDER / BANANAHUB_AUTH_MODE / BANANAHUB_MODEL",
             f"  env GOOGLE_GEMINI_BASE_URL / GEMINI_BASE_URL / BANANAHUB_BASE_URL",
             f"  env GOOGLE_CLOUD_PROJECT / GOOGLE_CLOUD_LOCATION",
-            f"  {SKILL_CONFIG_PATH}",
         ]
         print(json.dumps({
             "status": "error",
@@ -882,7 +902,7 @@ def _maybe_install_dependencies(provider, force=False, interactive=False):
     return {**result, "missing": packages}
 
 
-def _build_init_checks(config, resolved_from, config_sources, explicit_resolved_from, skip_test=False):
+def _build_init_checks(config, resolved_from, config_sources, explicit_resolved_from, skip_test=False, skipped_env=None):
     checks = []
     actual_sources = _list_config_sources(config_sources, explicit_resolved_from)
 
@@ -891,6 +911,8 @@ def _build_init_checks(config, resolved_from, config_sources, explicit_resolved_
         "ok": bool(actual_sources),
         "sources": actual_sources,
         "preferred_path": str(SKILL_CONFIG_PATH),
+        "precedence": _config_precedence_state(),
+        "env_shadowed_config_sources": _env_shadowed_config_sources(skipped_env),
         **({} if actual_sources else {"error": f"No config found. Create {SKILL_CONFIG_PATH} with config quickset, or use environment variables."}),
     })
 
@@ -1169,7 +1191,7 @@ def cmd_init(args):
         _run_init_wizard(args)
         return
 
-    config, resolved_from, config_sources, explicit_resolved_from = _load_merged_config(
+    config, resolved_from, config_sources, explicit_resolved_from, skipped_env = _load_merged_config(
         config_file=getattr(args, "config", None)
     )
     if getattr(args, "install_deps", False):
@@ -1186,9 +1208,10 @@ def cmd_init(args):
         config_sources,
         explicit_resolved_from,
         skip_test=getattr(args, "skip_test", False),
+        skipped_env=skipped_env,
     )
     all_ok = all(c["ok"] for c in checks)
-    diagnosis = _diagnose_config_state(config, resolved_from, config_sources, explicit_resolved_from, args=args)
+    diagnosis = _diagnose_config_state(config, resolved_from, config_sources, explicit_resolved_from, skipped_env=skipped_env, args=args)
     response = {
         "status": "ok" if all_ok else "incomplete",
         "checks": checks,
@@ -1213,7 +1236,7 @@ def cmd_init(args):
 
 def cmd_config_show(args):
     """Show effective and persisted config state."""
-    config, resolved_from, config_sources, explicit_resolved_from = _load_merged_config(
+    config, resolved_from, config_sources, explicit_resolved_from, skipped_env = _load_merged_config(
         config_file=getattr(args, "config", None)
     )
     runtime_support = _runtime_support_status(config)
@@ -1222,9 +1245,11 @@ def cmd_config_show(args):
         "status": "ok",
         "preferred_path": str(SKILL_CONFIG_PATH),
         "existing_sources": _list_config_sources(config_sources, explicit_resolved_from),
+        "precedence": _config_precedence_state(),
         "effective_config": _serialize_effective_config(config),
         "resolved_from": _serialize_resolved_from(config, resolved_from),
         "ignored_config_sources": _inactive_config_sources(config, resolved_from),
+        "env_shadowed_config_sources": _env_shadowed_config_sources(skipped_env),
         "runtime_support": runtime_support,
         "custom_endpoint_enabled": bool(config.get("GOOGLE_GEMINI_BASE_URL") or config.get("OPENAI_BASE_URL") or config.get("BANANAHUB_CHATGPT_BASE_URL")),
         "telemetry": {
@@ -1574,7 +1599,7 @@ def cmd_config_quickset(args):
     _save_config_update_or_exit(persisted_config, target_config, profile=profile)
 
 
-def _diagnose_config_state(config, resolved_from=None, config_sources=None, explicit_resolved_from=None, args=None):
+def _diagnose_config_state(config, resolved_from=None, config_sources=None, explicit_resolved_from=None, skipped_env=None, args=None):
     resolved_from = resolved_from or {}
     config_sources = config_sources or []
     explicit_resolved_from = explicit_resolved_from or {}
@@ -1656,9 +1681,11 @@ def _diagnose_config_state(config, resolved_from=None, config_sources=None, expl
         "provider_label": _provider_display_name(provider),
         "profile": profile,
         "existing_sources": _list_config_sources(config_sources, explicit_resolved_from),
+        "precedence": _config_precedence_state(),
         "effective_config": effective,
         "resolved_from": _serialize_resolved_from(config, resolved_from),
         "ignored_config_sources": ignored_config_sources,
+        "env_shadowed_config_sources": _env_shadowed_config_sources(skipped_env),
         "runtime_support": runtime_support,
         "validation_errors": validation_errors,
         "active_api_key": {
@@ -1688,6 +1715,7 @@ def _diagnose_config_state(config, resolved_from=None, config_sources=None, expl
             "If the user does not want secrets in chat, provide the quickset command with placeholders for their local terminal.",
             "Use init --wizard only as a human-terminal fallback.",
             "GPT Image 2 is the recommended default model; preserve an explicit provider/model the user already configured.",
+            "Persisted profiles take precedence over environment variables by default; env vars fill missing fields unless BANANAHUB_ENV_OVERRIDE=1 is set.",
             "Treat ignored_config_sources as informational only; they are not active for this provider.",
             "Install missing dependencies locally before attempting provider calls.",
             "Use --test-generate only after the user consents to spend image-generation quota.",
@@ -1697,7 +1725,7 @@ def _diagnose_config_state(config, resolved_from=None, config_sources=None, expl
 
 def cmd_config_doctor(args):
     """Diagnose config and return actionable setup guidance."""
-    config, resolved_from, config_sources, explicit_resolved_from = _load_merged_config(
+    config, resolved_from, config_sources, explicit_resolved_from, skipped_env = _load_merged_config(
         config_file=getattr(args, "config", None)
     )
     config = _apply_command_provider_override(config, getattr(args, "provider", None))
@@ -1706,6 +1734,7 @@ def cmd_config_doctor(args):
         resolved_from=resolved_from,
         config_sources=config_sources,
         explicit_resolved_from=explicit_resolved_from,
+        skipped_env=skipped_env,
         args=args,
     )
     if getattr(args, "json", False):
@@ -1761,7 +1790,7 @@ def cmd_telemetry_track(args):
 
 def cmd_check_mode(args):
     """Report the executable BananaHub mode and capability layer boundaries."""
-    config, resolved_from, config_sources, explicit_resolved_from = _load_merged_config(
+    config, resolved_from, config_sources, explicit_resolved_from, skipped_env = _load_merged_config(
         config_file=getattr(args, "config", None)
     )
     config = _apply_command_provider_override(config, getattr(args, "provider", None))
@@ -1792,9 +1821,11 @@ def cmd_check_mode(args):
         "provider_ready": provider_ready,
         "host_native_available": host_native_available,
         "existing_sources": _list_config_sources(config_sources, explicit_resolved_from),
+        "precedence": _config_precedence_state(),
         "effective_config": _serialize_effective_config(config),
         "resolved_from": _serialize_resolved_from(config, resolved_from),
         "ignored_config_sources": _inactive_config_sources(config, resolved_from),
+        "env_shadowed_config_sources": _env_shadowed_config_sources(skipped_env),
         "runtime_support": runtime_support,
         "validation_errors": validation_errors,
         "active_api_key": {

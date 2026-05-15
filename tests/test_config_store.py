@@ -178,6 +178,134 @@ def test_persisted_config_roundtrip(tmp_path=None):
             tmp_dir.cleanup()
 
 
+def test_env_fills_missing_but_does_not_override_persisted_profile(tmp_path=None):
+    if tmp_path is None:
+        import tempfile
+
+        tmp_dir = tempfile.TemporaryDirectory()
+        config_path = Path(tmp_dir.name) / "config.json"
+    else:
+        tmp_dir = None
+        config_path = tmp_path / "config.json"
+
+    old_env = {
+        key: os.environ.get(key)
+        for key in [
+            "BANANAHUB_CHATGPT_API_KEY",
+            "BANANAHUB_CHATGPT_BASE_URL",
+            "BANANAHUB_MODEL",
+            "BANANAHUB_ENV_OVERRIDE",
+        ]
+    }
+    data = {
+        "default_profile": "chat",
+        "profiles": {
+            "chat": {
+                "provider": "chatgpt-compatible",
+                "chatgpt_api_key": "persisted-key",
+                "chatgpt_base_url": "https://token.bigfish.space",
+                "model": "gpt-5.4",
+            }
+        },
+    }
+
+    try:
+        config_store.write_persisted_config(data, config_path=config_path)
+        os.environ["BANANAHUB_CHATGPT_API_KEY"] = "env-key"
+        os.environ["BANANAHUB_CHATGPT_BASE_URL"] = "https://old.example/chat"
+        os.environ["BANANAHUB_MODEL"] = "env-model"
+        os.environ.pop("BANANAHUB_ENV_OVERRIDE", None)
+
+        config, resolved, sources, explicit, skipped = config_store.load_merged_config(
+            None,
+            canonicalize,
+            lambda path: {},
+            config_path=config_path,
+        )
+
+        assert config["BANANAHUB_CHATGPT_API_KEY"] == "persisted-key"
+        assert config["BANANAHUB_CHATGPT_BASE_URL"] == "https://token.bigfish.space"
+        assert config["BANANAHUB_MODEL"] == "gpt-5.4"
+        assert resolved["BANANAHUB_CHATGPT_BASE_URL"] == str(config_path)
+        assert sources == [str(config_path)]
+        assert explicit["BANANAHUB_CHATGPT_BASE_URL"] == str(config_path)
+        assert {
+            "key": "BANANAHUB_CHATGPT_BASE_URL",
+            "alias": "BANANAHUB_CHATGPT_BASE_URL",
+            "source": "env:BANANAHUB_CHATGPT_BASE_URL",
+            "active_source": str(config_path),
+            "reason": "persistent_config_precedence",
+        } in skipped
+    finally:
+        for key, value in old_env.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+        if tmp_dir is not None:
+            tmp_dir.cleanup()
+
+
+def test_env_override_flag_allows_env_to_override_persisted_profile(tmp_path=None):
+    if tmp_path is None:
+        import tempfile
+
+        tmp_dir = tempfile.TemporaryDirectory()
+        config_path = Path(tmp_dir.name) / "config.json"
+    else:
+        tmp_dir = None
+        config_path = tmp_path / "config.json"
+
+    old_env = {
+        key: os.environ.get(key)
+        for key in [
+            "BANANAHUB_CHATGPT_API_KEY",
+            "BANANAHUB_CHATGPT_BASE_URL",
+            "BANANAHUB_MODEL",
+            "BANANAHUB_ENV_OVERRIDE",
+        ]
+    }
+    data = {
+        "default_profile": "chat",
+        "profiles": {
+            "chat": {
+                "provider": "chatgpt-compatible",
+                "chatgpt_api_key": "persisted-key",
+                "chatgpt_base_url": "https://token.bigfish.space",
+                "model": "gpt-5.4",
+            }
+        },
+    }
+
+    try:
+        config_store.write_persisted_config(data, config_path=config_path)
+        os.environ["BANANAHUB_CHATGPT_API_KEY"] = "env-key"
+        os.environ["BANANAHUB_CHATGPT_BASE_URL"] = "https://old.example/chat"
+        os.environ["BANANAHUB_MODEL"] = "env-model"
+        os.environ["BANANAHUB_ENV_OVERRIDE"] = "1"
+
+        config, resolved, _, _, skipped = config_store.load_merged_config(
+            None,
+            canonicalize,
+            lambda path: {},
+            config_path=config_path,
+        )
+
+        assert config["BANANAHUB_CHATGPT_API_KEY"] == "env-key"
+        assert config["BANANAHUB_CHATGPT_BASE_URL"] == "https://old.example/chat"
+        assert config["BANANAHUB_MODEL"] == "env-model"
+        assert resolved["BANANAHUB_CHATGPT_BASE_URL"] == "env:BANANAHUB_CHATGPT_BASE_URL"
+        assert skipped == []
+    finally:
+        for key, value in old_env.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+        if tmp_dir is not None:
+            tmp_dir.cleanup()
+
+
 if __name__ == "__main__":
     test_profile_merge()
     test_chatgpt_inference_and_validation()
@@ -189,4 +317,6 @@ if __name__ == "__main__":
     test_resolved_from_is_provider_scoped_and_ignored_sources_are_explicit()
     test_command_provider_override()
     test_persisted_config_roundtrip()
+    test_env_fills_missing_but_does_not_override_persisted_profile()
+    test_env_override_flag_allows_env_to_override_persisted_profile()
     print("ok")

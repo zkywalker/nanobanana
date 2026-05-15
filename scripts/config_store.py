@@ -74,6 +74,10 @@ def normalize_config_value(env_key, value, canonicalize_model):
     return normalized
 
 
+def env_override_enabled():
+    return cfg.is_truthy(os.environ.get(cfg.ENV_OVERRIDE_FLAG))
+
+
 def apply_json_config(config, resolved_from, data, source, canonicalize_model, profile_name=None):
     data = resolve_profile_data(data, profile_name or os.environ.get("BANANAHUB_PROFILE"))
     for json_key, env_key in cfg.CONFIG_KEY_MAP.items():
@@ -90,7 +94,8 @@ def apply_json_config(config, resolved_from, data, source, canonicalize_model, p
         resolved_from[env_key] = source
 
 
-def apply_env_config(config, resolved_from, canonicalize_model):
+def apply_env_config(config, resolved_from, canonicalize_model, override=False, skipped_env=None):
+    skipped_env = skipped_env if skipped_env is not None else []
     for env_key, aliases in cfg.ENV_KEY_ALIASES.items():
         for alias in aliases:
             value = os.environ.get(alias)
@@ -102,6 +107,15 @@ def apply_env_config(config, resolved_from, canonicalize_model):
                 continue
             if value in (None, ""):
                 continue
+            if not override and env_key in config:
+                skipped_env.append({
+                    "key": env_key,
+                    "alias": alias,
+                    "source": f"env:{alias}",
+                    "active_source": resolved_from.get(env_key),
+                    "reason": "persistent_config_precedence",
+                })
+                break
             config[env_key] = value
             resolved_from[env_key] = f"env:{alias}"
             break
@@ -261,12 +275,19 @@ def load_merged_config(config_file, canonicalize_model, load_dotenv_fn, config_p
     config = {}
     resolved_from = {}
     explicit_resolved_from = {}
+    skipped_env = []
     existing_sources = []
     if config_path.exists():
         existing_sources.append(str(config_path))
         data = read_json_file(config_path)
         apply_json_config(config, resolved_from, data, str(config_path), canonicalize_model)
-    apply_env_config(config, resolved_from, canonicalize_model)
+    apply_env_config(
+        config,
+        resolved_from,
+        canonicalize_model,
+        override=env_override_enabled(),
+        skipped_env=skipped_env,
+    )
     if config_file:
         cf = Path(config_file)
         if not cf.exists():
@@ -281,7 +302,15 @@ def load_merged_config(config_file, canonicalize_model, load_dotenv_fn, config_p
     for source in existing_sources:
         if source not in deduped_sources:
             deduped_sources.append(source)
-    return config, resolved_from, deduped_sources, explicit_resolved_from
+    return config, resolved_from, deduped_sources, explicit_resolved_from, skipped_env
+
+
+def env_precedence_mode():
+    return "override" if env_override_enabled() else "fill-missing"
+
+
+def env_shadowed_config_sources(skipped_env):
+    return list(skipped_env or [])
 
 
 def apply_command_provider_override(config, provider):

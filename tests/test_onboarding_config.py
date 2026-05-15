@@ -161,6 +161,42 @@ def test_doctor_scopes_resolved_from_to_active_provider():
     assert diagnosis["ignored_config_sources"][0]["reason"] == "inactive for selected provider"
 
 
+def test_doctor_reports_env_shadowed_by_persisted_profile():
+    config = {
+        "BANANAHUB_PROVIDER": "chatgpt-compatible",
+        "BANANAHUB_TRANSPORT": "openai-rest",
+        "BANANAHUB_AUTH_MODE": "api_key",
+        "BANANAHUB_CHATGPT_API_KEY": "chat-key",
+        "BANANAHUB_CHATGPT_BASE_URL": "https://token.bigfish.space",
+        "BANANAHUB_MODEL": "gpt-5.4",
+        "BANANAHUB_PROFILE": "chat",
+    }
+    resolved = {
+        "BANANAHUB_PROVIDER": "config.json",
+        "BANANAHUB_TRANSPORT": "default:chatgpt-compatible",
+        "BANANAHUB_AUTH_MODE": "config.json",
+        "BANANAHUB_CHATGPT_API_KEY": "config.json",
+        "BANANAHUB_CHATGPT_BASE_URL": "config.json",
+        "BANANAHUB_MODEL": "config.json",
+        "BANANAHUB_PROFILE": "config.json",
+    }
+    skipped_env = [{
+        "key": "BANANAHUB_CHATGPT_BASE_URL",
+        "alias": "BANANAHUB_CHATGPT_BASE_URL",
+        "source": "env:BANANAHUB_CHATGPT_BASE_URL",
+        "active_source": "config.json",
+        "reason": "persistent_config_precedence",
+    }]
+
+    diagnosis = bananahub._diagnose_config_state(config, resolved_from=resolved, skipped_env=skipped_env)
+
+    assert diagnosis["status"] == "ok"
+    assert diagnosis["precedence"]["env_mode"] == "fill-missing"
+    assert diagnosis["effective_config"]["base_url"] == "https://token.bigfish.space"
+    assert diagnosis["env_shadowed_config_sources"] == skipped_env
+    assert any("BANANAHUB_ENV_OVERRIDE=1" in note for note in diagnosis["agent_notes"])
+
+
 def test_dependency_status_is_provider_aware():
     openai_deps = bananahub._dependency_status_for_provider("openai-compatible")
     google_deps = bananahub._dependency_status_for_provider("google-ai-studio")
@@ -197,6 +233,7 @@ if __name__ == "__main__":
     test_doctor_reports_missing_secret_and_agent_contract()
     test_quickset_can_read_api_key_from_stdin()
     test_doctor_scopes_resolved_from_to_active_provider()
+    test_doctor_reports_env_shadowed_by_persisted_profile()
     test_dependency_status_is_provider_aware()
     test_dependency_install_command_uses_current_python_user_site()
     test_skill_layer_runtime_stub_is_machine_readable()

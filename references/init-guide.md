@@ -20,6 +20,7 @@ When the user runs `init`, make BananaHub usable with the least possible back-an
 8. Do not run a paid image-generation test unless the user explicitly agrees. Model-list healthchecks are okay; generation smoke tests require consent.
 9. Default to GPT Image 2 through `openai-compatible` unless the user explicitly chooses another image channel or an existing config already resolves cleanly.
 10. Do not ask the user to interpret `resolved_from`, provider aliases, or ignored env vars. Use `effective_config`, `missing_fields`, and `ignored_config_sources` yourself and only surface the next action.
+11. Treat the persisted default profile as the user's durable choice. Environment variables fill missing fields by default; they override profile fields only when `BANANAHUB_ENV_OVERRIDE=1` is set.
 
 ## Provider Selection
 
@@ -104,6 +105,14 @@ python3 {baseDir}/scripts/bananahub.py config quickset --provider chatgpt-compat
 
 `config quickset` writes `~/.config/bananahub/config.json`. Prefer named profiles so users can switch API keys, endpoints, and models later without rebuilding setup.
 
+Default precedence is:
+
+1. `--config <file>` for an explicit one-off config
+2. selected profile from `~/.config/bananahub/config.json`
+3. environment variables as fallback values for fields not present in the selected profile
+
+Use `BANANAHUB_PROFILE=<name>` to select another persisted profile. Use `BANANAHUB_ENV_OVERRIDE=1` only for deliberate temporary environment overrides.
+
 ```json
 {
   "default_profile": "gpt",
@@ -139,6 +148,7 @@ Default profile names:
 - `effective_config`: masked key, base URL, model, endpoint resolution, capabilities
 - `resolved_from`: source of the active provider-scoped values only
 - `ignored_config_sources`: configured env/profile values that are inactive for the selected provider
+- `env_shadowed_config_sources`: env vars ignored because the selected persisted profile already defines that field
 - `missing_fields`: `api_key`, `base_url`, `project`, `location`, etc.
 - `missing_dependencies`: Python packages needed for the selected provider
 - `dependency_install_command`: safe local command for installing missing Python packages

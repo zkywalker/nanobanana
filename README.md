@@ -175,9 +175,11 @@ BANANAHUB_PROFILE=gpt python3 scripts/bananahub.py generate \
 
 The command should return `status: "ok"` with `actual_model: "gpt-image-2"`; telemetry `HTTP 403` warnings do not indicate generation failure.
 
-Config priority: `--config <file>` → environment variables → `~/.config/bananahub/config.json`.
+Config priority: `--config <file>` → selected profile in `~/.config/bananahub/config.json` → environment variables fill missing fields.
 
-Agent-facing diagnostics are provider-scoped: `resolved_from` only points to active values, while `ignored_config_sources` lists env/profile values that exist but are not used by the selected provider.
+Use `BANANAHUB_PROFILE=<name>` to pick another persisted profile. Set `BANANAHUB_ENV_OVERRIDE=1` only when environment variables should temporarily override profile fields.
+
+Agent-facing diagnostics are provider-scoped: `resolved_from` only points to active values, `ignored_config_sources` lists values inactive for the selected provider, and `env_shadowed_config_sources` lists environment values ignored because the selected profile already defines that field.
 
 ## How Prompt Optimization Works
 

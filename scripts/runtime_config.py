@@ -118,6 +118,8 @@ ENV_KEY_ALIASES = {
     "GOOGLE_GENAI_USE_VERTEXAI": ("GOOGLE_GENAI_USE_VERTEXAI",),
 }
 
+ENV_OVERRIDE_FLAG = "BANANAHUB_ENV_OVERRIDE"
+
 
 def mask_secret(value):
     if not value:

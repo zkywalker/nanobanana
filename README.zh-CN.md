@@ -175,9 +175,11 @@ BANANAHUB_PROFILE=gpt python3 scripts/bananahub.py generate \
 
 命令应返回 `status: "ok"` 和 `actual_model: "gpt-image-2"`；telemetry 的 `HTTP 403` 警告不代表生图失败。
 
-配置来源优先级：`--config <file>` → 环境变量 → `~/.config/bananahub/config.json`。
+配置来源优先级：`--config <file>` → `~/.config/bananahub/config.json` 中选中的 profile → 环境变量补缺。
 
-面向 agent 的诊断是 provider-scoped 的：`resolved_from` 只显示当前生效值来源；`ignored_config_sources` 会列出存在但未被当前 provider 使用的 env/profile，agent 通常不需要拿这些打扰用户。
+用 `BANANAHUB_PROFILE=<name>` 临时选择另一个持久化 profile。只有明确设置 `BANANAHUB_ENV_OVERRIDE=1` 时，环境变量才会临时覆盖 profile 字段。
+
+面向 agent 的诊断是 provider-scoped 的：`resolved_from` 只显示当前生效值来源；`ignored_config_sources` 会列出未被当前 provider 使用的值；`env_shadowed_config_sources` 会列出因为当前 profile 已有同名字段而被忽略的环境变量。
 
 ## Prompt 优化怎么工作
 
