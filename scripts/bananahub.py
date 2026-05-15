@@ -2943,7 +2943,10 @@ def cmd_generate(args):
                 else:
                     output_path = _default_output_path("bananahub", model)
 
-                if runtime_support["transport"] == TRANSPORT_OPENAI_REST:
+                if runtime_support["provider"] == PROVIDER_CHATGPT_COMPATIBLE:
+                    image = _save_png_bytes(image_bytes, output_path, resize_dims=resize_dims)
+                    output_files = [str(output_path)]
+                elif runtime_support["transport"] == TRANSPORT_OPENAI_REST:
                     provider_format = _provider_output_format(args)
                     if getattr(args, "output_format", None) and not user_output:
                         output_path = output_path.with_suffix(f".{provider_format}")
