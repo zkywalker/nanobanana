@@ -10,27 +10,16 @@ version: 1.1.0
 profile: diagram
 tags: [代码库, 项目结构, 架构图, README, repo, codebase, architecture, explainer]
 models:
-  - name: gemini-3-pro-image-preview
-    tested: false
-    quality: best
-  - name: gemini-3.1-flash-image-preview
-    tested: false
-    quality: good
   - name: gpt-image-2
     tested: false
     quality: best
+  - name: gemini-3-pro-image-preview
+    tested: false
+    quality: good
+  - name: gemini-3.1-flash-image-preview
+    tested: false
+    quality: good
 providers:
-  - id: google-ai-studio
-    family: gemini-image
-    models:
-      - id: gemini-3-pro-image-preview
-        aliases: [nano-banana-pro]
-        quality: best
-        prompt_variant: gemini
-      - id: gemini-3.1-flash-image-preview
-        aliases: [nano-banana-2]
-        quality: good
-        prompt_variant: gemini
   - id: openai
     family: gpt-image
     models:
@@ -40,6 +29,17 @@ providers:
       - id: gpt-image-1
         quality: ok
         prompt_variant: gpt-image
+  - id: google-ai-studio
+    family: gemini-image
+    models:
+      - id: gemini-3-pro-image-preview
+        aliases: [nano-banana-pro]
+        quality: good
+        prompt_variant: gemini
+      - id: gemini-3.1-flash-image-preview
+        aliases: [nano-banana-2]
+        quality: good
+        prompt_variant: gemini
 capabilities:
   generation: true
   edit: false
@@ -53,7 +53,7 @@ difficulty: intermediate
 category: developer
 samples: []
 created: 2026-03-31
-updated: 2026-04-29
+updated: 2026-05-15
 ---
 
 ## Goal
@@ -83,7 +83,7 @@ Turn real repository context into one clear visual: project map, architecture di
 2. Pick one diagram goal. Do not mix architecture, setup, roadmap, and marketing copy in the same image.
 3. Lock exact labels before generation. Prefer short module names over full implementation details.
 4. Choose one layout: left-to-right pipeline, layered architecture, hub-and-spoke, grouped repo map, or top-to-bottom setup flow.
-5. Generate with the provider-specific block. Review label accuracy and relationship accuracy before visual polish.
+5. Generate with the provider-specific block. Prefer `gpt-image-2` for first-pass output when available because text fidelity and strict label control matter most for repo diagrams.
 6. If the model invents modules, regenerate from a smaller source summary with a stricter label list.
 
 ## Prompt Blocks
@@ -111,6 +111,16 @@ Design one repository explainer diagram for {{project_name|this project}}. Title
 ```text
 Keep the same title, blocks, and relationships. Repair label accuracy, connector direction, spacing, and readability only. Remove any invented module or extra label.
 ```
+
+## Provider Prompt Rules
+
+### Provider Variant: gemini
+
+Use the planning, generation, and repair blocks above as written for Gemini/Nano Banana. Keep the source summary, exact labels, and verified relationships explicit.
+
+### Provider Variant: gpt-image
+
+Use the same workflow steps, but keep visible text especially strict: exact title, exact block labels only, exact relationships only, no extra labels, no paragraphs, no fake file names, no decorative code, and no invented modules.
 
 ## Success Checks
 
