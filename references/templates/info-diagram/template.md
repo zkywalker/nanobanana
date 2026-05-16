@@ -51,9 +51,15 @@ prompt_variants:
 aspect: "4:3"
 difficulty: beginner
 category: diagram
-samples: []
+samples:
+  - file: samples/sample-3.1-flash-01.png
+    provider: google-ai-studio
+    model: gemini-3.1-flash-image-preview
+    prompt_variant: gemini
+    prompt: "Create a tall infographic titled \"How Coffee Is Made: Bean to Cup\". Use exactly five stacked steps with these labels: \"Harvest\", \"Roast\", \"Grind\", \"Brew\", \"Serve\". Use warm coffee colors, simple icons, rounded cards, and clear arrows. Keep the layout readable and do not add extra steps."
+    aspect: "4:3"
 created: 2026-03-24
-updated: 2026-04-29
+updated: 2026-05-16
 ---
 
 ## 描述

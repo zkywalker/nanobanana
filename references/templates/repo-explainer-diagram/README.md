@@ -16,21 +16,19 @@ Starter workflow for turning README excerpts, directory summaries, or code notes
 
 ## Verified Models
 
-No sample image is checked in for this bundled starter template. The workflow is prompt- and schema-validated, with visual samples kept out of the skill package to keep installs lightweight.
+- `gemini-3-pro-image-preview` — verified with `samples/sample-3-pro-02.png` for a text-light template-flow diagram.
 
 ## Sample Outputs
 
-No sample outputs are included in this starter template. When adding samples in a remote template package, map each image to:
-
-| Image | Model | Prompt |
-|---|---|---|
-| `samples/<image>.png` | `<model-id>` | `samples/<prompt>.md` |
+| File | Provider | Model | Prompt Variant | Notes |
+|---|---|---|---|---|
+| `samples/sample-3-pro-02.png` | `google-ai-studio` | `gemini-3-pro-image-preview` | `gemini` | Legacy Nano Banana template-flow diagram with locked labels and simple connector structure. |
 
 ## Notes
 
 - Keep source summaries to 3–7 verified blocks.
 - Lock exact module names before generation.
-- Do not add samples here; heavy sample galleries belong in the remote BananaHub template library.
+- Keep the bundled sample count small; heavy sample galleries belong in the remote BananaHub template library.
 
 ## License
 

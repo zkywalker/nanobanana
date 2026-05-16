@@ -17,7 +17,7 @@ models:
     tested: false
     quality: good
   - name: gpt-image-2
-    tested: false
+    tested: true
     quality: best
 providers:
   - id: google-ai-studio
@@ -51,9 +51,15 @@ prompt_variants:
 aspect: "4:3"
 difficulty: intermediate
 category: content
-samples: []
+samples:
+  - file: samples/sample-gpt-image-2-01.png
+    provider: chatgpt-compatible
+    model: gpt-image-2
+    prompt_variant: gpt-image
+    prompt: "Design one article-summary infographic for busy readers. Title text: \"What Changes After AI Agents Join the Workflow\". Main message: \"Agents shift work from manual execution to review and orchestration\". Layout: one central takeaway plus exactly three supporting cards. The only supporting labels allowed are: \"Delegate\", \"Review\", \"Orchestrate\". Visual style: modern editorial information design, warm off-white background, dark ink text, banana-gold and teal accents, simple line icons. Do not add paragraphs, extra labels, fake numbers, invented claims, watermarks, or decorative filler. Keep all text large and legible."
+    aspect: "4:3"
 created: 2026-04-29
-updated: 2026-04-29
+updated: 2026-05-16
 ---
 
 ## Goal
@@ -112,6 +118,16 @@ Design one article-summary infographic for {{audience|busy readers}}. Title text
 ```text
 Keep the same article topic, title, takeaway, and exact labels. Repair only factual fidelity, text legibility, spacing, and reading order. Remove any invented labels, extra claims, fake numbers, or decorative clutter.
 ```
+
+## Provider Prompt Rules
+
+### Provider Variant: gemini
+
+Use the source compression, generation, and repair blocks above as written for Gemini/Nano Banana. Keep the source-derived facts, exact labels, layout, and brand style explicit.
+
+### Provider Variant: gpt-image
+
+Use the same workflow steps, but keep visible text especially strict: exact title, exact takeaway, exact supporting labels only, no extra labels, no paragraphs, no fake numbers, and no invented claims.
 
 ## Success Checks
 

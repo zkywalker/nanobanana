@@ -51,9 +51,15 @@ prompt_variants:
 aspect: "1:1"
 difficulty: beginner
 category: ecommerce
-samples: []
+samples:
+  - file: samples/sample-3.1-flash-01.png
+    provider: google-ai-studio
+    model: gemini-3.1-flash-image-preview
+    prompt_variant: gemini
+    prompt: "Create a clean studio catalog product image of black over-ear headphones. Show the product centered on a pure white background with a small natural contact shadow. Use soft studio lighting, crisp edges, accurate matte and leather material texture, and realistic scale. No props, people, badges, watermarks, or extra text."
+    aspect: "1:1"
 created: 2026-03-24
-updated: 2026-04-29
+updated: 2026-05-16
 ---
 
 ## 描述

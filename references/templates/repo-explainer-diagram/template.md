@@ -51,9 +51,15 @@ prompt_variants:
 aspect: "4:3"
 difficulty: intermediate
 category: developer
-samples: []
+samples:
+  - file: samples/sample-3-pro-02.png
+    provider: google-ai-studio
+    model: gemini-3-pro-image-preview
+    prompt_variant: gemini
+    prompt: "Create a clean repository workflow diagram titled \"Nano Banana Template Flow\". Use a top-to-bottom flow with the exact labels \"User Request\", \"Prompt Optimization\", \"Profile Match\", \"Template Suggestion\", and \"Generate or Edit\". Use simple connectors, high contrast, restrained teal and gold colors, and no extra paragraphs."
+    aspect: "4:3"
 created: 2026-03-31
-updated: 2026-05-15
+updated: 2026-05-16
 ---
 
 ## Goal

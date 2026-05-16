@@ -17,7 +17,7 @@ models:
     tested: false
     quality: good
   - name: gpt-image-2
-    tested: false
+    tested: true
     quality: best
 providers:
   - id: google-ai-studio
@@ -51,9 +51,15 @@ prompt_variants:
 aspect: "source"
 difficulty: beginner
 category: editing
-samples: []
+samples:
+  - file: samples/sample-gpt-image-2-01.png
+    provider: chatgpt-compatible
+    model: gpt-image-2
+    prompt_variant: gpt-image
+    prompt: "Design one clean workflow sample board for a background replacement edit template. Title text: \"Background Replacement Edit\". The only additional text allowed is: \"Source\", \"Replace background\", \"Preserve subject\". Show a simple product photo card flowing into a new warm studio background while the product silhouette stays unchanged. Layout: 16:9 product-doc workflow board with three labeled cards and arrows. Visual style: clean ecommerce editing guide, warm off-white background, dark readable text, banana-gold and teal accents, realistic but simplified product illustration. Do not include API keys, real brand logos, fake UI screenshots, paragraphs, extra labels, watermarks, or clutter. Keep labels large and exactly spelled."
+    aspect: "16:9"
 created: 2026-04-29
-updated: 2026-04-29
+updated: 2026-05-16
 ---
 
 ## 描述
