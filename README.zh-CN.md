@@ -2,6 +2,8 @@
 
 [English README](./README.md)
 
+![BananaHub Skill：agent-native image workflows](./docs/assets/github/readme-hero-gpt-5-4.png)
+
 BananaHub 是一个面向 AI 图像工作流的 agent skill：你用中文或混合语言描述需求，它负责整理 prompt、判断运行环境、选择合适的出图路径，并把生成、编辑、模板复用放在同一个 `/bananahub` 入口里。
 
 它不只是“帮你写 prompt”。BananaHub 更像一层图像工作流中台：上接 Agent，默认走 GPT Image 2，也能按你的配置适配 Gemini / Nano Banana、OpenAI 官方、兼容网关和宿主自带图像工具。
@@ -35,6 +37,12 @@ claude skill install https://github.com/bananahub-ai/bananahub-skill
 python3 scripts/bananahub.py check-mode --pretty
 ```
 
+## 工作流
+
+![BananaHub Workflow：Describe、Optimize、Route、Generate、Reuse](./docs/assets/github/user-flow-infographic-gpt-5-4.png)
+
+核心链路是：描述需求，BananaHub 优化并路由请求，通过已配置 provider 出图，然后复用归档 prompt 或模板。
+
 ## 三种运行模式
 
 | 模式 | 什么时候触发 | BananaHub 会怎么做 |
@@ -44,6 +52,12 @@ python3 scripts/bananahub.py check-mode --pretty
 | `prompt-only` | 没有可用 provider，也没有宿主图像工具 | 只产出高质量 prompt；不会假装已经出图 |
 
 CLI 里可以用 `BANANAHUB_HOST_IMAGEGEN=1` 或 `check-mode --host-imagegen` 显式声明宿主有图像工具。
+
+## 配置流程
+
+![Set up BananaHub：Install、Init、Configure、Check、Generate](./docs/assets/github/setup-guide-gpt-5-4.png)
+
+配置设计以 profile 为中心：初始化一次，把 provider 凭据持久化到本地，检查运行路径，让后续出图保持可预期。
 
 ## 适合哪些场景
 
@@ -198,6 +212,8 @@ BANANAHUB_PROFILE=gpt python3 scripts/bananahub.py generate \
 ## 模板生态
 
 模板分两类：
+
+![BananaHub Skill Architecture：User 到 Outputs，中间经过 Prompt Pipeline、Templates 和 Provider Router](./docs/assets/github/skill-architecture-gpt-5-4.png)
 
 - **prompt 模板**：适合一次组装一个稳定 prompt，例如产品白底图、信息图卡片、背景替换编辑。
 - **workflow 模板**：适合多步任务，例如文章一图流解读、代码库讲解图。

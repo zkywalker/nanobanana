@@ -2,6 +2,8 @@
 
 [简体中文说明](./README.zh-CN.md)
 
+![BananaHub Skill hero: agent-native image workflows](./docs/assets/github/readme-hero-gpt-5-4.png)
+
 BananaHub is an agent-native image workflow skill. Describe what you want in Chinese, English, or mixed language; BananaHub cleans up the prompt, detects the available runtime, routes the task to the right image path, and keeps generation, editing, templates, and reusable prompts under one `/bananahub` command.
 
 It is not just a prompt helper. BananaHub acts as a workflow layer between agents and image providers: GPT Image 2 by default, plus Gemini / Nano Banana, OpenAI official, compatible gateways, and host-native image tools when configured.
@@ -35,6 +37,12 @@ Check the current execution path:
 python3 scripts/bananahub.py check-mode --pretty
 ```
 
+## Workflow
+
+![BananaHub Workflow: describe, optimize, route, generate, reuse](./docs/assets/github/user-flow-infographic-gpt-5-4.png)
+
+The core loop is simple: describe the image, let BananaHub optimize and route the request, generate through the configured provider, then reuse the archived prompt or template.
+
 ## Runtime Modes
 
 | Mode | When It Applies | What BananaHub Does |
@@ -44,6 +52,12 @@ python3 scripts/bananahub.py check-mode --pretty
 | `prompt-only` | No provider and no host image tool are available | Returns a reusable prompt; never pretends an image was generated |
 
 For CLI checks, use `BANANAHUB_HOST_IMAGEGEN=1` or `check-mode --host-imagegen` to mark host-native image generation as available.
+
+## Setup Flow
+
+![Set up BananaHub: install, init, configure, check, generate](./docs/assets/github/setup-guide-gpt-5-4.png)
+
+Configuration is intentionally profile-based: initialize once, persist provider credentials locally, check the runtime path, and keep future runs predictable.
 
 ## Best Fit
 
@@ -198,6 +212,8 @@ This layer is cross-model. Provider-dependent features such as mask edit, exact 
 ## Templates
 
 Templates come in two shapes:
+
+![BananaHub Skill Architecture: user to outputs through prompt pipeline, templates, and provider router](./docs/assets/github/skill-architecture-gpt-5-4.png)
 
 - **Prompt templates** assemble one reusable prompt for stable jobs such as product clean shots, infographic cards, or background replacement edits.
 - **Workflow templates** guide multi-step jobs such as article one-page summaries or repository explainer diagrams.
